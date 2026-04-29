@@ -33,7 +33,21 @@ export default function AnalyticsDashboardPage() {
   }
 
   return (
-    <div className={cn('max-w-[1600px]', 'w-full', 'px-5', 'md:mt-[140px] mt-[70px]', 'mx-auto', 'pb-20', 'space-y-12', 'animate-in', 'fade-in', 'slide-in-from-bottom-4', 'duration-1000')}>
+    <div
+      className={cn(
+        "max-w-[1600px]",
+        "w-full",
+        "px-5",
+        "md:mt-[140px] mt-[70px]",
+        "mx-auto",
+        "pb-20",
+        "space-y-12",
+        "animate-in",
+        "fade-in",
+        "slide-in-from-bottom-4",
+        "duration-1000",
+      )}
+    >
       <section className="space-y-6">
         <AdminAnalyticsHeader />
         <AdminAnalyticsFilters />
@@ -45,21 +59,29 @@ export default function AnalyticsDashboardPage() {
 
       <hr className="border-border" />
 
-      <div className={cn('grid', 'grid-cols-1', '2xl:grid-cols-2', 'gap-12')}>
+      <div className={cn("grid", "grid-cols-1", "2xl:grid-cols-2", "gap-12")}>
         <AdminAnalyticsRevenueSection analytics={analytics} />
         <AdminAnalyticsAttendanceSection analytics={analytics} />
       </div>
 
-      <section className={cn('bg-muted/50', 'p-8', 'rounded-[3rem]', 'border', 'border-border')}>
-        <AdminAnalyticsConversionSection />
+      <section
+        className={cn(
+          "bg-muted/50",
+          "p-8",
+          "rounded-[3rem]",
+          "border",
+          "border-border",
+        )}
+      >
+        <AdminAnalyticsConversionSection analytics={analytics} />
       </section>
 
-      <div className={cn('grid', 'grid-cols-1', 'xl:grid-cols-2', 'gap-12')}>
+      <div className={cn("grid", "grid-cols-1", "xl:grid-cols-2", "gap-12")}>
         <AdminAnalyticsUserInsightsSection analytics={analytics} />
         <AdminAnalyticsEventPerformanceSection analytics={analytics} />
       </div>
 
-      <section className={cn('max-w-4xl', 'mx-auto')}>
+      <section className={cn("max-w-4xl", "mx-auto")}>
         <AdminAnalyticsRecentActivitySection analytics={analytics} />
       </section>
     </div>
