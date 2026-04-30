@@ -10,9 +10,9 @@ import {
   LuPhone,
   LuMapPin,
   LuFacebook,
-  LuTwitter,
   LuLinkedin,
   LuInstagram,
+  LuYoutube,
 } from "react-icons/lu";
 import logo from "@/assets/img/logo.webp";
 
@@ -75,16 +75,19 @@ export default function Footer() {
                 "leading-relaxed",
               )}
             >
-              Empowering students and graduates with career guidance,
-              mentorship, and real-world opportunities to thrive beyond school.
+              Shaping the Young for Future Career Success — through skills
+              training, mentorship, and the annual LASCADSS seminar series.
             </p>
             {/* Socials */}
             <div className={cn("flex", "gap-4", "mt-6")}>
               {[
-                { Icon: LuFacebook, href: "#" },
-                { Icon: LuTwitter, href: "#" },
-                { Icon: LuLinkedin, href: "#" },
-                { Icon: LuInstagram, href: "#" },
+                { Icon: LuFacebook, href: "https://facebook.com/diuscadi" },
+                {
+                  Icon: LuLinkedin,
+                  href: "https://linkedin.com/company/diuscadi",
+                },
+                { Icon: LuInstagram, href: "https://instagram.com/diuscadi" },
+                { Icon: LuYoutube, href: "https://youtube.com/@diuscadi" },
               ].map(({ Icon, href }, i) => (
                 <Link
                   key={i}
@@ -135,9 +138,12 @@ export default function Footer() {
             <h3 className={cn("font-semibold", "mb-4")}>Contact</h3>
             <div className={cn("space-y-4", "text-sm")}>
               {[
-                { Icon: LuMapPin, text: "Nigeria" },
+                {
+                  Icon: LuMapPin,
+                  text: "Dept. of IT, UNIZIK, Awka, Anambra State",
+                },
                 { Icon: LuMail, text: "info@diuscadi.org.ng" },
-                { Icon: LuPhone, text: "+234 803 590 6416" },
+                { Icon: LuPhone, text: "+234-8035906416" },
               ].map(({ Icon, text }) => (
                 <div
                   key={text}

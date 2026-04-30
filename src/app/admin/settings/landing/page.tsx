@@ -8,7 +8,7 @@
 //                    (POST /api/media/sign → Cloudinary → no confirm needed
 //                     for simple URL — we just store the secure_url from CDN)
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useToast } from "@/hooks/useToast";
@@ -16,6 +16,7 @@ import type {
   LandingSectionKey,
   BannerSlide,
   InitiativeConfig,
+  InitiativePhoto,
   ValidatorEntry,
   MissionConfig,
   WorkshopTopic,
@@ -24,6 +25,14 @@ import type {
   SupportEntry,
 } from "@/lib/models/landingPageConfig";
 import Image from "next/image";
+import { X } from "lucide-react";
+// ⬇ Use the same ImageUploader your profile page uses
+import { ImageUploader } from "@/components/ui/ImageUploader";
+import { createPortal } from "react-dom";
+import { useEvents } from "@/context/EventContext";
+import { EventSummary } from "@/context/EventContext";
+import type { UploadType } from "@/lib/services/CloudinaryService";
+import type { CloudinaryImage } from "@/types/cloudinary";
 
 // ─── Tab labels ────────────────────────────────────────────────────────────
 
@@ -39,6 +48,7 @@ const TABS = [
 
 type TabKey = LandingSectionKey;
 
+
 // ─── Typed config state ────────────────────────────────────────────────────
 
 interface LandingConfig {
@@ -51,6 +61,41 @@ interface LandingConfig {
   support?: { items: SupportEntry[] };
 }
 
+// Map folder names to upload types
+type LandingUploadContext =
+  | "landing/banners"
+  | "landing/initiative"
+  | "landing/validators"
+  | "landing/mission"
+  | "landing/experts"
+  | "landing/testimonials"
+  | "landing/sponsors";
+
+function resolveUploadType(folder: LandingUploadContext): UploadType {
+  switch (folder) {
+    case "landing/banners":    return "landing-banner";
+    case "landing/initiative": return "landing-initiative";
+    case "landing/validators": return "landing-logo";
+    case "landing/sponsors":   return "landing-logo";
+    case "landing/mission":    return "landing-person";
+    case "landing/experts":    return "landing-person";
+    case "landing/testimonials": return "landing-person";
+  }
+}
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("diuscadi_token");
+}
+
+function authHeaders(json = true): HeadersInit {
+  const token = getToken();
+  return {
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ─── Cloudinary signed-upload helper ──────────────────────────────────────
 //
 // Mirrors the pipeline in MediaContext / ImageUploader:
@@ -61,41 +106,113 @@ interface LandingConfig {
 // For the admin landing page we use uploadType = "event-banner" for all images
 // (wide format, 10 MB limit). Adjust per-field if needed.
 
-async function uploadImageToCloudinary(
-  file: File,
-  uploadType = "event-banner",
-): Promise<string> {
-  // Step 1 — get signed params from our server
-  const signRes = await fetch("/api/media/sign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uploadType, ownerId: "landing" }),
-  });
-  if (!signRes.ok) throw new Error("Failed to get upload signature");
 
-  const { signature, timestamp, apiKey, cloudName, folder, publicId, eager } =
-    await signRes.json();
+// ─── Image Upload Modal (portal) ──────────────────────────────────────────────
 
-  // Step 2 — upload directly to Cloudinary
-  const form = new FormData();
-  form.append("file", file);
-  form.append("signature", signature);
-  form.append("timestamp", String(timestamp));
-  form.append("api_key", apiKey);
-  form.append("folder", folder);
-  form.append("public_id", publicId);
-  form.append("eager", eager);
+function ImageUploadModal({
+  open,
+  onClose,
+  onUploaded,
+  folder,
+}: {
+   open: boolean;
+  onClose: () => void;
+  onUploaded: (url: string) => void;
+  folder: LandingUploadContext;
+}) {
+  if (!open || typeof window === "undefined") return null;
 
-  const cdnRes = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    { method: "POST", body: form },
+   const uploadType = resolveUploadType(folder);
+
+   // Shape and aspect hints per type
+   const isLogo =
+     folder === "landing/validators" || folder === "landing/sponsors";
+   const isBanner = folder === "landing/banners";
+   const isPerson =
+     folder === "landing/mission" ||
+     folder === "landing/experts" ||
+     folder === "landing/testimonials";
+
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative bg-background rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 rounded-full hover:bg-muted"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <h3 className="font-bold text-lg mb-4">Upload Image</h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          {isBanner && "Recommended: 1920 × 1080. Max 10 MB."}
+          {isLogo && "Logo will be padded to square. Max 3 MB."}
+          {isPerson && "Face-aware crop to square. Max 5 MB."}
+          {folder === "landing/initiative" && "Landscape photo. Max 8 MB."}
+        </p>
+        <ImageUploader
+          uploadType={uploadType}
+          currentUrl={null}
+          currentPublicId={null}
+          shape={isPerson ? "circle" : "square"}
+          aspectHint={
+            isBanner
+              ? "1920 × 1080"
+              : isLogo
+                ? "400 × 400"
+                : isPerson
+                  ? "400 × 400"
+                  : "1200 × 900"
+          }
+          label="Upload image"
+          cropLabel="Crop image"
+          onSuccess={(image: CloudinaryImage) => {
+            const url = image.imageUrl ?? image.imageCloudName ?? "";
+            if (url) {
+              onUploaded(url);
+              onClose();
+            }
+          }}
+          onRemove={() => {
+            // No-op in modal context — user can remove after modal closes
+          }}
+        />
+      </div>
+    </div>,
+    document.body,
   );
-  if (!cdnRes.ok) throw new Error("Cloudinary upload failed");
+}
 
-  const cdnData = await cdnRes.json();
-  // Use the eager transformed URL when available, else the raw secure_url
-  const eagerUrl: string | undefined = cdnData.eager?.[0]?.secure_url;
-  return eagerUrl ?? cdnData.secure_url;
+// ─── Shared save bar ──────────────────────────────────────────────────────────
+
+function SaveBar({
+  onSave,
+  saving,
+  saved,
+}: {
+  onSave: () => void;
+  saving: boolean;
+  saved: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-3 pt-4 border-t">
+      {saved && (
+        <span className="text-sm text-green-600 font-medium">✓ Saved</span>
+      )}
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Save Changes"}
+      </button>
+    </div>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────
@@ -106,10 +223,19 @@ export default function LandingSettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("banner");
   const [config, setConfig] = useState<LandingConfig>({});
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    
+    const { publicEvents, loadPublicEvents } = useEvents();
+
+    useEffect(() => {
+      loadPublicEvents(50); // load enough events for the dropdown
+    }, [loadPublicEvents]);
 
   useEffect(() => {
-    fetch("/api/admin/settings/landing")
+    fetch("/api/admin/settings/landing", {
+      headers: authHeaders(), // ← was missing
+    })
       .then((r) => r.json())
       .then(
         ({
@@ -128,17 +254,20 @@ export default function LandingSettingsPage() {
         toast({ title: "Failed to load config", variant: "destructive" }),
       )
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [toast]);
 
   async function save(sectionKey: LandingSectionKey, data: unknown) {
     setSaving(true);
+    setSaved(false);
     try {
       const res = await fetch("/api/admin/settings/landing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({ sectionKey, data }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Save failed");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
       toast({
         title: "Saved",
         description: `${sectionKey} updated.`,
@@ -154,7 +283,7 @@ export default function LandingSettingsPage() {
   async function hideSlide(slideId: string, hidden: boolean) {
     await fetch(`/api/admin/settings/landing/banner/${slideId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ hidden }),
     });
     setConfig((prev) => ({
@@ -171,6 +300,7 @@ export default function LandingSettingsPage() {
   async function deleteSlide(slideId: string) {
     await fetch(`/api/admin/settings/landing/banner/${slideId}`, {
       method: "DELETE",
+      headers: { Authorization: `Bearer ${getToken() ?? ""}` },
     });
     setConfig((prev) => ({
       ...prev,
@@ -217,6 +347,7 @@ export default function LandingSettingsPage() {
       {activeTab === "banner" && (
         <BannerTab
           slides={config.banner?.slides ?? []}
+          events={publicEvents}
           onChange={(slides) =>
             setConfig((p) => ({ ...p, banner: { slides } }))
           }
@@ -224,6 +355,7 @@ export default function LandingSettingsPage() {
           onHide={hideSlide}
           onDelete={deleteSlide}
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -233,6 +365,7 @@ export default function LandingSettingsPage() {
           onChange={(d) => setConfig((p) => ({ ...p, initiative: d }))}
           onSave={() => save("initiative", config.initiative)}
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -244,6 +377,7 @@ export default function LandingSettingsPage() {
           }
           onSave={() => save("validators", config.validators ?? { items: [] })}
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -253,6 +387,7 @@ export default function LandingSettingsPage() {
           onChange={(d) => setConfig((p) => ({ ...p, mission: d }))}
           onSave={() => save("mission", config.mission)}
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -266,6 +401,7 @@ export default function LandingSettingsPage() {
             save("workshopTopics", config.workshopTopics ?? { items: [] })
           }
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -275,6 +411,7 @@ export default function LandingSettingsPage() {
           onChange={(d) => setConfig((p) => ({ ...p, testimonials: d }))}
           onSave={() => save("testimonials", config.testimonials)}
           saving={saving}
+          saved={saved}
         />
       )}
 
@@ -284,6 +421,7 @@ export default function LandingSettingsPage() {
           onChange={(items) => setConfig((p) => ({ ...p, support: { items } }))}
           onSave={() => save("support", config.support ?? { items: [] })}
           saving={saving}
+          saved={saved}
         />
       )}
     </div>
@@ -294,65 +432,6 @@ export default function LandingSettingsPage() {
 // Shared sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SaveBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
-  return (
-    <div className="flex justify-end pt-4 border-t">
-      <button
-        onClick={onSave}
-        disabled={saving}
-        className="px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
-      >
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-    </div>
-  );
-}
-
-// ── Image upload button — uses the same signed-upload pipeline as ImageUploader
-function ImageUploadButton({
-  label,
-  uploadType = "event-banner",
-  onUploaded,
-}: {
-  label: string;
-  uploadType?: string;
-  onUploaded: (url: string) => void;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
-
-  return (
-    <label
-      className={`inline-flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded border text-sm hover:bg-muted ${uploading ? "opacity-50 pointer-events-none" : ""}`}
-    >
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        className="hidden"
-        disabled={uploading}
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setUploading(true);
-          try {
-            const url = await uploadImageToCloudinary(file, uploadType);
-            onUploaded(url);
-          } catch {
-            toast({
-              title: "Upload failed",
-              description: "Could not upload image.",
-              variant: "destructive",
-            });
-          } finally {
-            setUploading(false);
-          }
-          e.target.value = "";
-        }}
-      />
-      {uploading ? "⏳ Uploading…" : `📁 ${label}`}
-    </label>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Banner tab
@@ -360,36 +439,56 @@ function ImageUploadButton({
 
 function BannerTab({
   slides,
+  events,
   onChange,
   onSave,
   onHide,
   onDelete,
   saving,
+  saved,
 }: {
   slides: BannerSlide[];
+  events: EventSummary[];
   onChange: (slides: BannerSlide[]) => void;
   onSave: () => void;
   onHide: (id: string, hidden: boolean) => void;
   onDelete: (id: string) => void;
   saving: boolean;
+  saved: boolean;
 }) {
+  const [uploadModalFor, setUploadModalFor] = useState<string | null>(null);
+
   function addSlide() {
-    const newSlide: BannerSlide = {
-      id: nanoid(),
-      type: "custom",
-      imageUrl: "",
-      title: "",
-      subtitle: "",
-      ctaLabel: "",
-      ctaHref: "",
-      hidden: false,
-      order: slides.length,
-    };
-    onChange([...slides, newSlide]);
+    onChange([
+      ...slides,
+      {
+        id: crypto.randomUUID(),
+        type: "custom",
+        imageUrl: "",
+        title: "",
+        subtitle: "",
+        ctaLabel: "",
+        ctaHref: "",
+        hidden: false,
+        order: slides.length,
+      },
+    ]);
   }
 
-  function updateSlide(id: string, patch: Partial<BannerSlide>) {
+  function updateSlide(id: string, patch: Record<string, unknown>) {
     onChange(slides.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+
+  // When user picks an event, auto-populate from event data
+  function handleEventSelect(slideId: string, eventId: string) {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    updateSlide(slideId, {
+      linkedEventId: event.id,
+      ctaHref: `/events/${event.id}`,
+      imageUrl: event.image || "",
+      // Title and subtitle stay editable for marketing customisation
+    });
   }
 
   return (
@@ -435,25 +534,27 @@ function BannerTab({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Type</label>
+                <label className="text-xs text-muted-foreground">
+                  Slide Type
+                </label>
                 <select
                   value={slide.type}
                   onChange={(e) =>
                     updateSlide(slide.id, {
-                      type: e.target.value as BannerSlide["type"],
+                      type: e.target.value,
+                      linkedEventId: undefined,
                     })
                   }
                   className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
                 >
                   <option value="custom">Custom / Ad</option>
-                  <option value="event">Event</option>
-                  <option value="blog">Blog Post</option>
-                  <option value="ad">Ad</option>
+                  <option value="event">Link to Event</option>
+                  <option value="blog">Blog (coming soon)</option>
                 </select>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">
-                  Expires at (optional)
+                  Expires at (optional — nightly cron hides it)
                 </label>
                 <input
                   type="datetime-local"
@@ -474,15 +575,67 @@ function BannerTab({
               </div>
             </div>
 
+            {/* Event picker — only shown for type === "event" */}
+            {slide.type === "event" && (
+              <div className="p-3 rounded-lg bg-muted border border-border space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Select Event
+                </label>
+                <select
+                  value={slide.linkedEventId ?? ""}
+                  onChange={(e) => handleEventSelect(slide.id, e.target.value)}
+                  className="w-full rounded border px-2 py-1.5 text-sm bg-background"
+                >
+                  <option value="">— choose an event —</option>
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.title} —{" "}
+                      {new Date(ev.eventDate).toLocaleDateString("en-NG", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </option>
+                  ))}
+                </select>
+                {slide.linkedEventId && (
+                  <p className="text-xs text-muted-foreground">
+                    CTA will link to{" "}
+                    <code className="bg-background px-1 rounded">
+                      {slide.ctaHref}
+                    </code>{" "}
+                    and image will be pre-filled from event. You can still
+                    override the title, subtitle, and CTA label below.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Blog placeholder */}
+            {slide.type === "blog" && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                Blog integration coming soon. Use Custom / Ad type for now.
+              </div>
+            )}
+
+            {/* Title + Subtitle — always editable */}
             <div>
-              <label className="text-xs text-muted-foreground">Title</label>
+              <label className="text-xs text-muted-foreground">
+                Title
+                {slide.type === "event" &&
+                  " (override event title for marketing)"}
+              </label>
               <input
                 type="text"
                 value={slide.title}
                 onChange={(e) =>
                   updateSlide(slide.id, { title: e.target.value })
                 }
-                placeholder="LASCADSS 7.0 — Coming 2026"
+                placeholder={
+                  slide.type === "event"
+                    ? "e.g. Don't miss LASCADSS 7.0 — Register now"
+                    : "Banner headline"
+                }
                 className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
               />
             </div>
@@ -495,14 +648,16 @@ function BannerTab({
                 onChange={(e) =>
                   updateSlide(slide.id, { subtitle: e.target.value })
                 }
+                placeholder="Supporting text below the title"
                 className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
               />
             </div>
 
+            {/* CTA fields — always editable, pre-filled for events */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">
-                  CTA Label
+                  CTA Button Label
                 </label>
                 <input
                   type="text"
@@ -517,6 +672,7 @@ function BannerTab({
               <div>
                 <label className="text-xs text-muted-foreground">
                   CTA Link
+                  {slide.type === "event" && " (auto-filled from event)"}
                 </label>
                 <input
                   type="text"
@@ -524,33 +680,65 @@ function BannerTab({
                   onChange={(e) =>
                     updateSlide(slide.id, { ctaHref: e.target.value })
                   }
-                  placeholder="/events"
+                  placeholder="/events/my-event"
                   className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+                  readOnly={slide.type === "event" && !!slide.linkedEventId}
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {slide.imageUrl && (
-                        <Image
-                            width={500}
-                            height={300}
-                  src={slide.imageUrl}
-                  alt=""
-                  className="h-16 w-28 object-cover rounded border"
-                />
-              )}
-              <ImageUploadButton
-                label="Upload Banner Image"
-                uploadType="event-banner"
-                onUploaded={(url) => updateSlide(slide.id, { imageUrl: url })}
-              />
+            {/* Image — portal upload modal */}
+            <div>
+              <label className="text-xs text-muted-foreground">
+                Banner Image
+                {slide.type === "event" && slide.linkedEventId
+                  ? " (auto-filled from event — upload to override)"
+                  : ""}
+              </label>
+              <div className="flex items-center gap-3 mt-1">
+                {slide.imageUrl && (
+                  <Image
+                  width={500}
+                  height={300}
+                    src={slide.imageUrl}
+                    alt=""
+                    className="h-16 w-28 object-cover rounded border"
+                  />
+                )}
+                <button
+                  onClick={() => setUploadModalFor(slide.id)}
+                  className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+                >
+                  📁 {slide.imageUrl ? "Change Image" : "Upload Image"}
+                </button>
+                {slide.imageUrl && (
+                  <button
+                    onClick={() => updateSlide(slide.id, { imageUrl: "" })}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      {/* Image upload portal modal */}
+      <ImageUploadModal
+        open={uploadModalFor !== null}
+        onClose={() => setUploadModalFor(null)}
+        folder="landing/banners"
+        onUploaded={(url) => {
+          if (uploadModalFor) {
+            updateSlide(uploadModalFor, { imageUrl: url });
+          }
+          setUploadModalFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -564,31 +752,20 @@ function InitiativeTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   data: InitiativeConfig | undefined;
   onChange: (d: InitiativeConfig) => void;
   onSave: () => void;
   saving: boolean;
+  saved: boolean;
 }) {
+const [uploadOpen, setUploadOpen] = useState(false);
   const d: InitiativeConfig = data ?? {
     sectionTitle: "",
     yearLabel: "",
     photos: [],
   };
-
-  function addPhoto(url: string) {
-    onChange({
-      ...d,
-      photos: [
-        ...(d.photos ?? []),
-        { id: nanoid(), imageUrl: url, order: d.photos?.length ?? 0 },
-      ],
-    });
-  }
-
-  function removePhoto(id: string) {
-    onChange({ ...d, photos: d.photos.filter((p) => p.id !== id) });
-  }
 
   return (
     <div className="space-y-4">
@@ -618,24 +795,32 @@ function InitiativeTab({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-sm font-medium">Photos (fade carousel)</label>
-          <ImageUploadButton
-            label="Add Photo"
-            uploadType="event-gallery"
-            onUploaded={addPhoto}
-          />
+          <button
+            onClick={() => setUploadOpen(true)}
+            className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          >
+            + Add Photo
+          </button>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {d.photos.map((photo) => (
             <div key={photo.id} className="relative group">
               <Image
-                      width={500}
-                      height={300}
+                width={500}
+                height={300}
                 src={photo.imageUrl}
                 alt={photo.alt ?? ""}
                 className="h-24 w-full object-cover rounded border"
               />
               <button
-                onClick={() => removePhoto(photo.id)}
+                onClick={() =>
+                  onChange({
+                    ...d,
+                    photos: d.photos.filter(
+                      (p: InitiativePhoto) => p.id !== photo.id,
+                    ),
+                  })
+                }
                 className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs hidden group-hover:flex items-center justify-center"
               >
                 ×
@@ -645,7 +830,26 @@ function InitiativeTab({
         </div>
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        folder="landing/initiative"
+        onUploaded={(url) =>
+          onChange({
+            ...d,
+            photos: [
+              ...(d.photos ?? []),
+              {
+                id: crypto.randomUUID(),
+                imageUrl: url,
+                order: d.photos?.length ?? 0,
+              },
+            ],
+          })
+        }
+      />
     </div>
   );
 }
@@ -659,12 +863,17 @@ function ValidatorsTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   items: ValidatorEntry[];
   onChange: (items: ValidatorEntry[]) => void;
   onSave: () => void;
   saving: boolean;
+  saved: boolean;
 }) {
+
+    const [uploadFor, setUploadFor] = useState<string | null>(null);
+
   function add() {
     const entry: ValidatorEntry = {
       id: nanoid(),
@@ -708,11 +917,12 @@ function ValidatorsTab({
                 className="h-10 w-10 object-contain rounded border"
               />
             )}
-            <ImageUploadButton
-              label="Logo"
-              uploadType="inst-logo"
-              onUploaded={(url) => update(v.id, { logoUrl: url })}
-            />
+            <button
+              onClick={() => setUploadFor(v.id)}
+              className="px-2 py-1 rounded border text-xs hover:bg-muted shrink-0"
+            >
+              {v.logoUrl ? "Change Logo" : "Upload Logo"}
+            </button>
             <input
               type="text"
               value={v.name}
@@ -742,7 +952,17 @@ function ValidatorsTab({
         ))}
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadFor !== null}
+        onClose={() => setUploadFor(null)}
+        folder="landing/validators"
+        onUploaded={(url) => {
+          if (uploadFor) update(uploadFor, { logoUrl: url });
+          setUploadFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -756,12 +976,15 @@ function MissionTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   data: MissionConfig | undefined;
   onChange: (d: MissionConfig) => void;
   onSave: () => void;
   saving: boolean;
+        saved: boolean;
 }) {
+    const [uploadOpen, setUploadOpen] = useState(false);
   const d: MissionConfig = data ?? {
     photoUrl: "",
     name: "",
@@ -781,11 +1004,12 @@ function MissionTab({
             className="h-24 w-20 object-cover rounded-lg border"
           />
         )}
-        <ImageUploadButton
-          label="Upload Leader Photo"
-          uploadType="avatar"
-          onUploaded={(url) => onChange({ ...d, photoUrl: url })}
-        />
+        <button
+          onClick={() => setUploadOpen(true)}
+          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+        >
+          📁 {d.photoUrl ? "Change Photo" : "Upload Leader Photo"}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -821,7 +1045,14 @@ function MissionTab({
         />
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        folder="landing/mission"
+        onUploaded={(url) => onChange({ ...d, photoUrl: url })}
+      />
     </div>
   );
 }
@@ -835,12 +1066,15 @@ function WorkshopTopicsTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   items: WorkshopTopic[];
   onChange: (items: WorkshopTopic[]) => void;
   onSave: () => void;
   saving: boolean;
+  saved: boolean;
 }) {
+    const [uploadFor, setUploadFor] = useState<string | null>(null);
   function add() {
     const entry: WorkshopTopic = {
       id: nanoid(),
@@ -907,15 +1141,42 @@ function WorkshopTopicsTab({
                 type="text"
                 value={w.expertTitle ?? ""}
                 onChange={(e) => update(w.id, { expertTitle: e.target.value })}
-                placeholder="Expert title / org"
+                placeholder="Expert title / organisation"
                 className="rounded border px-2 py-1.5 text-sm bg-background"
               />
+            </div>
+            <div className="flex items-center gap-3">
+              {w.expertPhotoUrl && (
+                <Image
+                width={500}
+                height={300}
+                  src={w.expertPhotoUrl}
+                  alt=""
+                  className="h-10 w-10 object-cover rounded-full border"
+                />
+              )}
+              <button
+                onClick={() => setUploadFor(w.id)}
+                className="px-2 py-1 rounded border text-xs hover:bg-muted"
+              >
+                {w.expertPhotoUrl ? "Change Photo" : "Expert Photo (optional)"}
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadFor !== null}
+        onClose={() => setUploadFor(null)}
+        folder="landing/experts"
+        onUploaded={(url) => {
+          if (uploadFor) update(uploadFor, { expertPhotoUrl: url });
+          setUploadFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -929,12 +1190,15 @@ function TestimonialsTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   data: TestimonialsConfig | undefined;
   onChange: (d: TestimonialsConfig) => void;
   onSave: () => void;
   saving: boolean;
+  saved: boolean;
 }) {
+    const [uploadFor, setUploadFor] = useState<string | null>(null);
   const d: TestimonialsConfig = data ?? {
     videoUrl: "",
     videoType: "youtube",
@@ -1039,17 +1303,39 @@ function TestimonialsTab({
                 placeholder="Their testimonial..."
                 className="w-full rounded border px-2 py-1.5 text-sm bg-background"
               />
-              <ImageUploadButton
-                label="Photo (optional)"
-                uploadType="avatar"
-                onUploaded={(url) => updateItem(t.id, { photoUrl: url })}
-              />
+              <div className="flex items-center gap-3">
+                {t.photoUrl && (
+                  <Image
+                    width={500}
+                    height={300}
+                    src={t.photoUrl}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover border"
+                  />
+                )}
+                <button
+                  onClick={() => setUploadFor(t.id)}
+                  className="px-2 py-1 rounded border text-xs hover:bg-muted"
+                >
+                  {t.photoUrl ? "Change Photo" : "Photo (optional)"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadFor !== null}
+        onClose={() => setUploadFor(null)}
+        folder="landing/testimonials"
+        onUploaded={(url) => {
+          if (uploadFor) updateItem(uploadFor, { photoUrl: url });
+          setUploadFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -1063,12 +1349,16 @@ function SupportTab({
   onChange,
   onSave,
   saving,
+  saved,
 }: {
   items: SupportEntry[];
   onChange: (items: SupportEntry[]) => void;
   onSave: () => void;
   saving: boolean;
+  saved: boolean;
 }) {
+    const [uploadFor, setUploadFor] = useState<string | null>(null);
+
   function add() {
     const entry: SupportEntry = {
       id: nanoid(),
@@ -1114,11 +1404,12 @@ function SupportTab({
                   className="h-10 w-10 object-contain rounded border"
                 />
               )}
-              <ImageUploadButton
-                label="Logo"
-                uploadType="inst-logo"
-                onUploaded={(url) => update(s.id, { logoUrl: url })}
-              />
+              <button
+                onClick={() => setUploadFor(s.id)}
+                className="px-2 py-1 rounded border text-xs hover:bg-muted shrink-0"
+              >
+                {s.logoUrl ? "Change Logo" : "Upload Logo"}
+              </button>
               <input
                 type="text"
                 value={s.name}
@@ -1145,7 +1436,7 @@ function SupportTab({
                 ×
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            {/* <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">
                   Website URL (optional)
@@ -1172,12 +1463,22 @@ function SupportTab({
                   className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
                 />
               </div>
-            </div>
+            </div> */}
           </div>
         ))}
       </div>
 
-      <SaveBar onSave={onSave} saving={saving} />
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      <ImageUploadModal
+        open={uploadFor !== null}
+        onClose={() => setUploadFor(null)}
+        folder="landing/sponsors"
+        onUploaded={(url) => {
+          if (uploadFor) update(uploadFor, { logoUrl: url });
+          setUploadFor(null);
+        }}
+      />
     </div>
   );
 }

@@ -514,11 +514,13 @@ export default function AboutPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 items-center text-center">
               {[
                 "MTN Nigeria",
+                "Airtel Nigeria",
                 "PA-CENT Technologies Limited",
+                "AICIC",
+                "Codex Microsystems",
                 "Nnamdi Azikiwe University",
                 "ASUU, UNIZIK",
                 "Anambra State Government",
-                "Nigerian Communications Commission",
                 "Ministry of Communications",
                 "Corporate Sponsors (LASCADSS 7.0 — Open)",
               ].map((partner, i) => (

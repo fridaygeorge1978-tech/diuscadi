@@ -95,6 +95,30 @@ const TRANSFORM_PRESETS: Record<UploadType, UploadPreset> = {
     folder: "diuscadi/institutions/banners",
     maxFileSize: 10 * 1024 * 1024, // 10 MB
   },
+
+  // ── Landing Page ──────────────────────────────────────────────────────────────
+  "landing-banner": {
+    eager: "c_fill,w_1920,h_1080,f_webp,q_auto:good",
+    folder: "diuscadi/landing/banners",
+    maxFileSize: 10 * 1024 * 1024, // 10 MB
+  },
+  "landing-initiative": {
+    eager: "c_fill,w_1200,h_900,f_webp,q_auto:good",
+    folder: "diuscadi/landing/initiative",
+    maxFileSize: 8 * 1024 * 1024,
+  },
+  "landing-logo": {
+    // For validators, sponsors, supporters — pad preserves logo aspect ratio
+    eager: "c_pad,w_400,h_400,b_white,f_webp,q_auto:good",
+    folder: "diuscadi/landing/logos",
+    maxFileSize: 3 * 1024 * 1024,
+  },
+  "landing-person": {
+    // Expert photos, testimonial avatars, leader photo
+    eager: "c_fill,g_face,w_400,h_400,f_webp,q_auto:good",
+    folder: "diuscadi/landing/people",
+    maxFileSize: 5 * 1024 * 1024,
+  },
 };
 
 // ─── Public ID generator ──────────────────────────────────────────────────────
@@ -225,5 +249,10 @@ export function allowedRolesForType(type: UploadType): string[] {
     case "inst-banner":
       // Institution media is webmaster-only — institutional identity is sensitive
       return ["webmaster"];
+    case "landing-banner":
+    case "landing-initiative":
+    case "landing-logo":
+    case "landing-person":
+      return ["admin", "webmaster"];
   }
 }

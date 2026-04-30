@@ -100,6 +100,10 @@ export const CROP_ASPECT: Record<UploadType, number> = {
   "event-banner": 1200 / 630, // ~1.905:1
   "inst-banner": 1200 / 400, // 3:1
   "event-gallery": 1200 / 900, // 4:3
+  "landing-banner":    1920 / 1080,  // 16/9
+  "landing-initiative":4 / 3,
+  "landing-logo":      1,
+  "landing-person":    1,
 };
 
 // ─── Output canvas dimensions ─────────────────────────────────────────────────
@@ -114,6 +118,10 @@ const OUTPUT_DIMS: Record<UploadType, { width: number; height: number }> = {
   "event-banner": { width: 1200, height: 630 },
   "inst-banner": { width: 1200, height: 400 },
   "event-gallery": { width: 1200, height: 900 },
+  "landing-banner":     { width: 1920, height: 1080 },
+  "landing-initiative": { width: 1200, height: 900  },
+  "landing-logo":       { width: 400,  height: 400  },
+  "landing-person":     { width: 400,  height: 400  },
 };
 
 // ─── Types that use a white background fill ───────────────────────────────────

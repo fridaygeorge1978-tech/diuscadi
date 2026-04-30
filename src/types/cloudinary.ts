@@ -15,7 +15,11 @@ export type ImageTag =
   | "event-banner" // Event: wide hero / cover image
   | "event-gallery" // Event: gallery item
   | "inst-logo" // Institution: square logo
-  | "inst-banner"; // Institution: wide banner / cover
+  | "inst-banner" // Institution: wide banner / cover
+  | "landing-banner"
+  | "landing-initiative"
+  | "landing-logo"
+  | "landing-person";
 
 /**
  * Subset of Cloudinary's signed upload response that we persist.
