@@ -62,7 +62,7 @@ const PROGRAMS = [
   {
     id: "cv-interview",
     topic: "CV and Interview Presentations",
-    speaker: "Associate Prof A.F Nwofor",
+    speaker: "Prof A.F Nwofor",
     role: "Information Management Consultant",
     image: nwafor, // Replace with actual image
     bio: "Florence has over 32 years of experience in Information and Knowledge Management in the higher education industry. She is well versed in issues of collection and preservation of indigenous knowledge, oral history, and culture, positioning her as a seasoned consultant.",

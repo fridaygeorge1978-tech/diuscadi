@@ -37,7 +37,7 @@ export const AboutSection = () => {
 
             <div className="absolute -bottom-8 -right-4 md:-right-8 p-6 max-w-xs rounded-2xl bg-background/10 backdrop-blur-xl border border-background/20 shadow-2xl hover:bg-black/60 transition-all duration-500 group">
               <p className="text-background font-bold text-lg leading-tight">
-                Prof. Chief Ikechukwu Umeh
+                Prof. Ikechukwu Umeh
               </p>
               <p className="text-background/70 text-sm mt-1">
                 FNCS, FIPMD · Founder & Convener, DIUSCADI

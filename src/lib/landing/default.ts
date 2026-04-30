@@ -71,7 +71,7 @@ export const defaultWorkshopTopics = [
   {
     id: "w1",
     topic: "CV and Interview Presentations",
-    expertName: "Associate Prof A.F Nwofor",
+    expertName: "Prof A.F Nwofor",
     icon: "📄",
     order: 0,
   },
