@@ -102,7 +102,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   },
   appearance: {
     theme: "light",
-    accent: "emerald",
+    accent: "sky",
   },
   privacy: {
     profileVisibility: "members",
