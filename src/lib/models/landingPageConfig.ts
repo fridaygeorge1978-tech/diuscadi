@@ -96,7 +96,7 @@ export interface TestimonialsConfig {
   videoType: "youtube" | "cloudinary";
 }
 
-type SectionDataMap = {
+export type SectionDataMap = {
   banner:         { slides: BannerSlide[] };
   initiative:     InitiativeConfig;
   validators:     { items: ValidatorEntry[] };

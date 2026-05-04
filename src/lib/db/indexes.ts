@@ -310,6 +310,14 @@ export async function createIndexes() {
   ]);
   console.log("✓ landingPageConfig + newsletterSubscribers");
 
+  await db
+    .collection("aboutPageConfig")
+    .createIndex(
+      { sectionKey: 1 },
+      { unique: true, name: "aboutPageConfig_sectionKey" },
+    );
+  console.log("✓ aboutPageConfig");
+
   console.log("\n✅ All indexes created.");
 }
 

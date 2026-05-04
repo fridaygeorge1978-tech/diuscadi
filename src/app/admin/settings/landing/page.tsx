@@ -352,7 +352,7 @@ export default function LandingSettingsPage() {
     );
 
   return (
-    <div className={cn('max-w-4xl', 'mx-auto', 'p-6', 'space-y-6')}>
+    <div className={cn('max-w-4xl', 'mx-auto', 'p-6 mt-20', 'space-y-6')}>
       <div>
         <h1 className={cn('text-2xl', 'font-bold')}>Landing Page Settings</h1>
         <p className={cn('text-muted-foreground', 'text-sm', 'mt-1')}>

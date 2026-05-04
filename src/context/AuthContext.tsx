@@ -22,6 +22,18 @@ import type { CloudinaryImage } from "@/types/cloudinary";
 
 export type { EduStatus, AccountRole, Committee, CommitteeMembership, Skill };
 
+function isSafeRedirect(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    // If it parses as a full URL with a host, it's external — reject it
+    const parsed = new URL(url, "http://localhost");
+    return parsed.hostname === "localhost" && url.startsWith("/");
+  } catch {
+    // Malformed URL — reject
+    return false;
+  }
+}
+
 // ─── 1. Types ────────────────────────────────────────────────────────────────
 
 export interface User {
@@ -91,7 +103,10 @@ interface AuthContextType {
   sessionStatus: SessionStatus;
   error: AuthError | null;
 
-  signin: (credentials: SigninCredentials) => Promise<void>;
+  signin: (
+    credentials: SigninCredentials,
+    redirectTo?: string,
+  ) => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -240,7 +255,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Signin ─────────────────────────────────────────────────────────────────
   const signin = useCallback(
-    async (credentials: SigninCredentials) => {
+    async (credentials: SigninCredentials, redirectTo?: string) => {
       setIsLoading(true);
       setError(null);
       try {
@@ -271,7 +286,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setToken(data.token);
         setUser(authedUser);
         setSessionStatus("restored");
-        router.push(ROLE_REDIRECTS[authedUser.role]);
+
+        // ── Redirect logic ──────────────────────────────────────────────────
+      // Priority: explicit redirectTo param → safe ?redirect= in URL → role default
+      const destination =
+        isSafeRedirect(redirectTo)
+          ? redirectTo
+          : ROLE_REDIRECTS[authedUser.role];
+
+        router.push(destination);
       } catch (err: unknown) {
         setError({
           message: err instanceof Error ? err.message : "Invalid credentials.",

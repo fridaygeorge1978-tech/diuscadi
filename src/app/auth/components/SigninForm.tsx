@@ -18,8 +18,12 @@ function detectIdentifierType(value: string): "email" | "phone" | "unknown" {
   return "unknown";
 }
 
+interface SigninFormProps {
+  redirectTo?: string;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
-export const SigninForm: React.FC = () => {
+export const SigninForm: React.FC<SigninFormProps> = ({ redirectTo }) => {
   const { signin, isLoading, error, clearError } = useAuth();
 
   const [identifier, setIdentifier] = useState("");
@@ -56,7 +60,7 @@ export const SigninForm: React.FC = () => {
       password,
     };
 
-    await signin(credentials);
+    await signin(credentials, redirectTo);
   };
 
   const displayError = localErr ?? error?.message ?? null;

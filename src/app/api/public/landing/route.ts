@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { Collections } from "@/lib/db/collections";
+import type {
+  BannerSlide,
+  InitiativeConfig,
+  MissionConfig,
+  TestimonialsConfig,
+  SectionDataMap,
+} from "@/lib/models/landingPageConfig";
 import {
   defaultBannerSlides,
   defaultInitiative,
@@ -9,7 +16,7 @@ import {
   defaultWorkshopTopics,
   defaultTestimonials,
   defaultSupport,
-} from "@/lib/landing/default";
+} from "@/lib/defaults/landingDef";
 
 export const revalidate = 60;
 
@@ -17,20 +24,26 @@ export async function GET() {
   try {
     const db = await getDb();
     const docs = await Collections.landingPageConfig(db).find({}).toArray();
-    const byKey = Object.fromEntries(docs.map((d) => [d.sectionKey, d.data]));
 
-    const bannerData = byKey.banner as { slides: any[] } | undefined;
+    const byKey = Object.fromEntries(
+      docs.map((d) => [d.sectionKey, d.data]),
+    ) as Partial<SectionDataMap>;
+
+    const bannerData = byKey.banner as { slides: BannerSlide[] } | undefined;
     const bannerSlides = bannerData
       ? bannerData.slides.filter((s) => !s.hidden)
       : defaultBannerSlides;
 
     return NextResponse.json({
       banner: { slides: bannerSlides },
-      initiative: byKey.initiative ?? defaultInitiative,
+      initiative:
+        (byKey.initiative as InitiativeConfig | undefined) ?? defaultInitiative,
       validators: byKey.validators ?? { items: defaultValidators },
-      mission: byKey.mission ?? defaultMission,
+      mission: (byKey.mission as MissionConfig | undefined) ?? defaultMission,
       workshopTopics: byKey.workshopTopics ?? { items: defaultWorkshopTopics },
-      testimonials: byKey.testimonials ?? defaultTestimonials,
+      testimonials:
+        (byKey.testimonials as TestimonialsConfig | undefined) ??
+        defaultTestimonials,
       support: byKey.support ?? { items: defaultSupport },
     });
   } catch (err) {

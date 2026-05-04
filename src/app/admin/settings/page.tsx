@@ -18,11 +18,12 @@ import {
   LuShield,
   LuBug,
   LuChevronRight,
+  LuLayoutTemplate, // ← Landing Page
+  LuInfo, // ← About Page
 } from "react-icons/lu";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import type {
-  PlatformConfigKey,
   PlatformConfigValue,
 } from "@/lib/models/platformConfig";
 
@@ -37,9 +38,15 @@ const SUB_PAGES = [
   },
   {
     label: "Landing Page",
-    icon: LuBuilding2,
+    icon: LuLayoutTemplate, // ← was LuBuilding2
     path: "/admin/settings/landing",
-    desc: "Manage Landing page datas and informations",
+    desc: "Manage landing page data and information",
+  },
+  {
+    label: "About Page", // ← new entry
+    icon: LuInfo,
+    path: "/admin/settings/about",
+    desc: "Manage about page sections and content",
   },
   {
     label: "Faculties",

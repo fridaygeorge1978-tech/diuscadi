@@ -70,7 +70,8 @@ export const RouteGuard = ({ children }: { children: React.ReactNode }) => {
 
     // 4. Auth required but not logged in → /auth
     if (routeRule.authRequired && !isAuthenticated) {
-      router.replace("/auth");
+      const redirectParam = encodeURIComponent(pathname);
+      router.replace(`/auth?redirect=${redirectParam}`);
       return;
     }
 
