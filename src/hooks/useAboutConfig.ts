@@ -9,6 +9,7 @@ import type {
   AboutSDG,
   AboutPartner,
   AboutCTA,
+  AboutTeamMember,
 } from "@/lib/models/aboutPageConfig";
 
 export interface AboutConfig {
@@ -18,6 +19,7 @@ export interface AboutConfig {
   values: { items: AboutValueCard[] };
   focusAreas: { items: AboutFocusArea[] };
   timeline: { items: AboutMilestone[] };
+  team: { items: AboutTeamMember[] };
   sdgs: { items: AboutSDG[] };
   partners: { items: AboutPartner[] };
   cta: AboutCTA;

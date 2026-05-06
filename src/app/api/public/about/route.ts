@@ -11,6 +11,7 @@ import {
   defaultSDGs,
   defaultPartners,
   defaultCTA,
+  defaultTeam,
 } from "@/lib/defaults/aboutDefault";
 
 export const revalidate = 60;
@@ -28,6 +29,7 @@ export async function GET() {
       values: byKey.values ?? { items: defaultValues },
       focusAreas: byKey.focusAreas ?? { items: defaultFocusAreas },
       timeline: byKey.timeline ?? { items: defaultTimeline },
+      team: byKey.team ?? { items: defaultTeam },
       sdgs: byKey.sdgs ?? { items: defaultSDGs },
       partners: byKey.partners ?? { items: defaultPartners },
       cta: byKey.cta ?? defaultCTA,
@@ -41,6 +43,7 @@ export async function GET() {
       values: { items: defaultValues },
       focusAreas: { items: defaultFocusAreas },
       timeline: { items: defaultTimeline },
+      team: { items: defaultTeam },
       sdgs: { items: defaultSDGs },
       partners: { items: defaultPartners },
       cta: defaultCTA,

@@ -25,6 +25,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
       { status: 403 },
     );
   }
+
   try {
     const { sectionKey, data } = (await req.json()) as {
       sectionKey: AboutSectionKey;
@@ -36,6 +37,14 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         { status: 400 },
       );
     }
+
+      if (sectionKey === "team" && req.auth.role !== "webmaster") {
+        return NextResponse.json(
+          { error: "Webmaster access required for team section" },
+          { status: 403 },
+        );
+    }
+    
     const db = await getDb();
     const now = new Date();
     await Collections.aboutPageConfig(db).updateOne(

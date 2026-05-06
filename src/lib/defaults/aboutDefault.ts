@@ -8,6 +8,7 @@ import type {
   AboutSDG,
   AboutPartner,
   AboutCTA,
+  AboutTeamMember,
 } from "@/lib/models/aboutPageConfig";
 
 export const defaultHero: AboutHero = {
@@ -258,6 +259,8 @@ export const defaultSDGs: AboutSDG[] = [
     desc: "Collaboration with corporate organisations and institutions.",
   },
 ];
+
+export const defaultTeam: AboutTeamMember[] = [];
 
 export const defaultPartners: AboutPartner[] = [
   { id: "p1", name: "MTN Nigeria", order: 0 },

@@ -309,6 +309,7 @@ interface AdminContextValue extends AdminState {
     opts?: { role?: string; status?: string; search?: string; page?: number },
     token?: string,
   ) => Promise<void>;
+  loadUsersMultiRole: (roles: string[], token?: string) => Promise<void>;
   changeRole: (userId: string, role: string, token: string) => Promise<void>;
   changeStatus: (
     userId: string,
@@ -351,7 +352,11 @@ interface AdminContextValue extends AdminState {
     token?: string,
   ) => Promise<void>;
 
-  updateVerifiedSkills: (userId: string, verifiedSkills: string[], token: string) => Promise<void>;
+  updateVerifiedSkills: (
+    userId: string,
+    verifiedSkills: string[],
+    token: string,
+  ) => Promise<void>;
 
   createEvent: (
     payload: CreateEventPayload,
@@ -514,6 +519,45 @@ export function AdminProvider({
           ...s,
           users: data.users,
           usersPagination: data.pagination,
+          loadingUsers: false,
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          loadingUsers: false,
+          error: err instanceof Error ? err.message : "Failed to load users",
+        }));
+      }
+    },
+    [token],
+  );
+
+  const loadUsersMultiRole = useCallback(
+    async (roles: string[], tkn = token ?? "") => {
+      if (!tkn) return;
+      setState((s) => ({ ...s, loadingUsers: true, error: null }));
+      try {
+        const results = await Promise.all(
+          roles.map((role) =>
+            fetch(`/api/admin/users?role=${role}&limit=100&page=1`, {
+              headers: { Authorization: `Bearer ${tkn}` },
+            }).then((r) => r.json() as Promise<{ users: AdminUser[] }>),
+          ),
+        );
+
+        const merged = results.flatMap((r) => r.users ?? []);
+
+        // Deduplicate by id
+        const seen = new Set<string>();
+        const deduped = merged.filter((u) => {
+          if (seen.has(u.id)) return false;
+          seen.add(u.id);
+          return true;
+        });
+
+        setState((s) => ({
+          ...s,
+          users: deduped,
           loadingUsers: false,
         }));
       } catch (err) {
@@ -1096,6 +1140,7 @@ export function AdminProvider({
       value={{
         ...state,
         loadUsers,
+        loadUsersMultiRole,
         changeRole,
         changeStatus,
         loadUserTickets,

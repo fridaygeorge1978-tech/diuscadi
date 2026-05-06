@@ -9,7 +9,8 @@ export type AboutSectionKey =
   | "timeline"
   | "sdgs"
   | "partners"
-  | "cta";
+  | "cta"
+  | "team"; 
 
 // ─── Section data shapes ───────────────────────────────────────────────────────
 
@@ -85,6 +86,22 @@ export interface AboutCTA {
   cta2Href: string;
 }
 
+// Add new type:
+export type TeamTier = "leadership" | "core" | "volunteer";
+
+export interface AboutTeamMember {
+  id: string;
+  userId?: string; // platform user ID — set when populated from user picker
+  // undefined for manual entries (advisors, patrons, etc.)
+  displayName: string;
+  professionalTitle: string; // e.g. "Head of Publicity · Software Engineer"
+  shortBio: string;
+  photoUrl: string;
+  tier: TeamTier;
+  visible: boolean; // false = hidden from public, kept in DB for easy restore
+  order: number;
+}
+
 // ─── Section data map ──────────────────────────────────────────────────────────
 
 export type AboutSectionDataMap = {
@@ -96,6 +113,7 @@ export type AboutSectionDataMap = {
   timeline: { items: AboutMilestone[] };
   sdgs: { items: AboutSDG[] };
   partners: { items: AboutPartner[] };
+  team: { items: AboutTeamMember[] };
   cta: AboutCTA;
 };
 

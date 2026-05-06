@@ -20,8 +20,12 @@ import type {
   AboutSDG,
   AboutPartner,
   AboutCTA,
+  AboutTeamMember,
+  TeamTier,
 } from "@/lib/models/aboutPageConfig";
 import Image from "next/image";
+import { useAdmin } from "@/context/AdminContext";
+import { cn } from "../../../../lib/utils";
 
 // ─── Available icon keys (must match ICON_MAP in about/page.tsx) ──────────────
 const ICON_OPTIONS = [
@@ -55,6 +59,25 @@ function authHeaders(json = true): HeadersInit {
   };
 }
 
+const HEAD_ROLE_KEYWORDS = [
+  "head",
+  "lead",
+  "director",
+  "coordinator",
+  "president",
+  "chair",
+  "convener",
+  "founder",
+  "manager",
+  "officer",
+];
+
+function isHeadPosition(committeeRole: string | null | undefined): boolean {
+  if (!committeeRole) return false;
+  const lower = committeeRole.toLowerCase();
+  return HEAD_ROLE_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
   { key: "hero", label: "🌟 Hero" },
@@ -65,6 +88,7 @@ const TABS = [
   { key: "timeline", label: "📅 LASCADSS Timeline" },
   { key: "sdgs", label: "🌍 SDGs" },
   { key: "partners", label: "🤝 Partners" },
+  { key: "team", label: "👥 Team" },
   { key: "cta", label: "📣 CTA" },
 ] as const;
 
@@ -78,7 +102,17 @@ interface AboutConfig {
   timeline?: { items: AboutMilestone[] };
   sdgs?: { items: AboutSDG[] };
   partners?: { items: AboutPartner[] };
+  team?: { items: AboutTeamMember[] };
   cta?: AboutCTA;
+}
+
+interface EligibleUser {
+  id: string;
+  fullName: { firstname: string; secondname?: string; lastname?: string }; // ✅ lastname optional
+  email: string;
+  role: string;
+  committee: string | null;
+  avatar: { imageUrl?: string } | string | null;
 }
 
 // ─── Shared SaveBar ───────────────────────────────────────────────────────────
@@ -92,14 +126,14 @@ function SaveBar({
   saved: boolean;
 }) {
   return (
-    <div className="flex items-center justify-end gap-3 pt-4 border-t">
+    <div className={cn('flex', 'items-center', 'justify-end', 'gap-3', 'pt-4', 'border-t')}>
       {saved && (
-        <span className="text-sm text-green-600 font-medium">✓ Saved</span>
+        <span className={cn('text-sm', 'text-green-600', 'font-medium')}>✓ Saved</span>
       )}
       <button
         onClick={onSave}
         disabled={saving}
-        className="px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+        className={cn('px-5', 'py-2', 'rounded-md', 'bg-primary', 'text-primary-foreground', 'text-sm', 'font-medium', 'disabled:opacity-50')}
       >
         {saving ? "Saving…" : "Save Changes"}
       </button>
@@ -122,20 +156,20 @@ function PhotoUploadModal({
   if (!open || typeof window === "undefined") return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className={cn('fixed', 'inset-0', 'z-50', 'flex', 'items-center', 'justify-center', 'bg-black/60', 'backdrop-blur-sm')}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative bg-background rounded-2xl shadow-2xl border border-border p-6 w-full max-w-md mx-4">
+      <div className={cn('relative', 'bg-background', 'rounded-2xl', 'shadow-2xl', 'border', 'border-border', 'p-6', 'w-full', 'max-w-md', 'mx-4')}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-full hover:bg-muted"
+          className={cn('absolute', 'top-4', 'right-4', 'p-1', 'rounded-full', 'hover:bg-muted')}
         >
-          <X className="w-4 h-4" />
+          <X className={cn('w-4', 'h-4')} />
         </button>
-        <h3 className="font-bold text-lg mb-1">Upload Photo</h3>
-        <p className="text-xs text-muted-foreground mb-4">
+        <h3 className={cn('font-bold', 'text-lg', 'mb-1')}>Upload Photo</h3>
+        <p className={cn('text-xs', 'text-muted-foreground', 'mb-4')}>
           Face-aware crop to square. Max 5 MB.
         </p>
         <ImageUploader
@@ -221,7 +255,7 @@ export default function AboutSettingsPage() {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+      <div className={cn('flex', 'items-center', 'justify-center', 'h-64', 'text-muted-foreground', 'text-sm')}>
         Loading about page config…
       </div>
     );
@@ -229,17 +263,17 @@ export default function AboutSettingsPage() {
   const ownerId = user?.id ?? "about-cms";
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className={cn('max-w-4xl', 'mx-auto', 'mt-20', 'p-6', 'space-y-6')}>
       <div>
-        <h1 className="text-2xl font-bold">About Page Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <h1 className={cn('text-2xl', 'font-bold')}>About Page Settings</h1>
+        <p className={cn('text-muted-foreground', 'text-sm', 'mt-1')}>
           Manage every section of the public About page. Changes go live within
           60 seconds.
         </p>
       </div>
 
       {/* Tab bar */}
-      <div className="flex flex-wrap gap-2 border-b pb-3">
+      <div className={cn('flex', 'flex-wrap', 'gap-2', 'border-b', 'pb-3')}>
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -334,6 +368,17 @@ export default function AboutSettingsPage() {
           saved={saved}
         />
       )}
+      {activeTab === "team" && (
+  <TeamTab
+    items={config.team?.items ?? []}
+    onChange={(items) => setConfig((p) => ({ ...p, team: { items } }))}
+    onSave={() => save("team", config.team ?? { items: [] })}
+    saving={saving}
+    saved={saved}
+    ownerId={ownerId}
+    isWebmaster={user?.role === "webmaster"}
+  />
+)}
       {activeTab === "cta" && (
         <CTATab
           data={config.cta}
@@ -372,9 +417,9 @@ function HeroTab({
   };
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className={cn('grid', 'grid-cols-2', 'gap-4')}>
         <div>
-          <label className="text-xs text-muted-foreground">
+          <label className={cn('text-xs', 'text-muted-foreground')}>
             Headline (plain text)
           </label>
           <input
@@ -382,11 +427,11 @@ function HeroTab({
             value={d.headline}
             onChange={(e) => onChange({ ...d, headline: e.target.value })}
             placeholder="Shaping the Young for"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">
+          <label className={cn('text-xs', 'text-muted-foreground')}>
             Headline Accent (coloured)
           </label>
           <input
@@ -394,58 +439,58 @@ function HeroTab({
             value={d.headlineAccent}
             onChange={(e) => onChange({ ...d, headlineAccent: e.target.value })}
             placeholder="Future Career Success"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Subtitle</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Subtitle</label>
         <textarea
           rows={4}
           value={d.subtitle}
           onChange={(e) => onChange({ ...d, subtitle: e.target.value })}
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className={cn('grid', 'grid-cols-2', 'gap-4')}>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 1 Label</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 1 Label</label>
           <input
             type="text"
             value={d.cta1Label}
             onChange={(e) => onChange({ ...d, cta1Label: e.target.value })}
             placeholder="Our Mission"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 1 Link</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 1 Link</label>
           <input
             type="text"
             value={d.cta1Href}
             onChange={(e) => onChange({ ...d, cta1Href: e.target.value })}
             placeholder="#mission"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 2 Label</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 2 Label</label>
           <input
             type="text"
             value={d.cta2Label}
             onChange={(e) => onChange({ ...d, cta2Label: e.target.value })}
             placeholder="LASCADSS Programme"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 2 Link</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 2 Link</label>
           <input
             type="text"
             value={d.cta2Href}
             onChange={(e) => onChange({ ...d, cta2Href: e.target.value })}
             placeholder="#lascadss"
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
       </div>
@@ -470,13 +515,13 @@ function StatsTab({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
+      <p className={cn('text-xs', 'text-muted-foreground')}>
         These 4 stats appear in the glass bar below the hero.
       </p>
       {items.map((s, i) => (
-        <div key={i} className="grid grid-cols-2 gap-3 border rounded-lg p-3">
+        <div key={i} className={cn('grid', 'grid-cols-2', 'gap-3', 'border', 'rounded-lg', 'p-3')}>
           <div>
-            <label className="text-xs text-muted-foreground">Value</label>
+            <label className={cn('text-xs', 'text-muted-foreground')}>Value</label>
             <input
               type="text"
               value={s.value}
@@ -488,11 +533,11 @@ function StatsTab({
                 )
               }
               placeholder="5,000+"
-              className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Label</label>
+            <label className={cn('text-xs', 'text-muted-foreground')}>Label</label>
             <input
               type="text"
               value={s.label}
@@ -504,7 +549,7 @@ function StatsTab({
                 )
               }
               placeholder="Students Trained"
-              className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
           </div>
         </div>
@@ -512,7 +557,7 @@ function StatsTab({
       {items.length < 4 && (
         <button
           onClick={() => onChange([...items, { value: "", label: "" }])}
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Stat
         </button>
@@ -557,27 +602,27 @@ function FounderStoryTab({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-muted-foreground">Section Heading</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Section Heading</label>
         <input
           type="text"
           value={d.heading}
           onChange={(e) => onChange({ ...d, heading: e.target.value })}
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-xs text-muted-foreground">
+        <label className={cn('text-xs', 'text-muted-foreground')}>
           Story Paragraphs
         </label>
         {d.paragraphs.map((p, i) => (
-          <div key={i} className="flex gap-2 items-start">
+          <div key={i} className={cn('flex', 'gap-2', 'items-start')}>
             <textarea
               rows={3}
               value={p}
               onChange={(e) => updateParagraph(i, e.target.value)}
               placeholder={`Paragraph ${i + 1}`}
-              className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
             <button
               onClick={() =>
@@ -586,7 +631,7 @@ function FounderStoryTab({
                   paragraphs: d.paragraphs.filter((_, j) => j !== i),
                 })
               }
-              className="text-red-500 px-2 mt-1"
+              className={cn('text-red-500', 'px-2', 'mt-1')}
             >
               ×
             </button>
@@ -594,23 +639,23 @@ function FounderStoryTab({
         ))}
         <button
           onClick={() => onChange({ ...d, paragraphs: [...d.paragraphs, ""] })}
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Paragraph
         </button>
       </div>
 
       <div>
-        <label className="text-xs text-muted-foreground">Quote Text</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Quote Text</label>
         <textarea
           rows={3}
           value={d.quoteText}
           onChange={(e) => onChange({ ...d, quoteText: e.target.value })}
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">
+        <label className={cn('text-xs', 'text-muted-foreground')}>
           Quote Attribution
         </label>
         <input
@@ -618,33 +663,35 @@ function FounderStoryTab({
           value={d.quoteAttribution}
           onChange={(e) => onChange({ ...d, quoteAttribution: e.target.value })}
           placeholder="— Prof. Chief Ikechukwu I. Umeh, Founder, DIUSCADI"
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className={cn('flex', 'items-center', 'gap-3')}>
         {d.photoUrl && (
           <Image
-            src={d.photoUrl}
-            alt=""
-            className="h-16 w-12 object-cover rounded-lg border"
-          />
+    src={d.photoUrl}
+    alt=""
+    width={48}
+    height={64}
+    className={cn('h-16', 'w-12', 'object-cover', 'rounded-lg', 'border')}
+  />
         )}
         <button
           onClick={() => setPhotoOpen(true)}
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           📁 {d.photoUrl ? "Change Photo" : "Upload Founder Photo"}
         </button>
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Photo Alt Text</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Photo Alt Text</label>
         <input
           type="text"
           value={d.photoAlt}
           onChange={(e) => onChange({ ...d, photoAlt: e.target.value })}
           placeholder="Prof. Chief Ikechukwu I. Umeh"
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
 
@@ -682,12 +729,12 @@ function IconTextItem({
   onRemove: () => void;
 }) {
   return (
-    <div className="border rounded-lg p-3 space-y-2">
-      <div className="flex gap-2 items-center">
+    <div className={cn('border', 'rounded-lg', 'p-3', 'space-y-2')}>
+      <div className={cn('flex', 'gap-2', 'items-center')}>
         <select
           value={iconKey}
           onChange={(e) => onIconChange(e.target.value)}
-          className="rounded border px-2 py-1.5 text-sm bg-background w-36"
+          className={cn('rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background', 'w-36')}
         >
           {ICON_OPTIONS.map((k) => (
             <option key={k} value={k}>
@@ -700,9 +747,9 @@ function IconTextItem({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder={titlePlaceholder}
-          className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
-        <button onClick={onRemove} className="text-red-500 px-2 text-lg">
+        <button onClick={onRemove} className={cn('text-red-500', 'px-2', 'text-lg')}>
           ×
         </button>
       </div>
@@ -711,7 +758,7 @@ function IconTextItem({
         value={desc}
         onChange={(e) => onDescChange(e.target.value)}
         placeholder="Description…"
-        className="w-full rounded border px-2 py-1.5 text-sm bg-background"
+        className={cn('w-full', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
       />
     </div>
   );
@@ -736,7 +783,7 @@ function ValuesTab({
   }
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className={cn('flex', 'justify-end')}>
         <button
           onClick={() =>
             onChange([
@@ -750,7 +797,7 @@ function ValuesTab({
               },
             ])
           }
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Value
         </button>
@@ -792,7 +839,7 @@ function FocusAreasTab({
   }
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className={cn('flex', 'justify-end')}>
         <button
           onClick={() =>
             onChange([
@@ -806,7 +853,7 @@ function FocusAreasTab({
               },
             ])
           }
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Focus Area
         </button>
@@ -848,7 +895,7 @@ function TimelineTab({
   }
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className={cn('flex', 'justify-end')}>
         <button
           onClick={() =>
             onChange([
@@ -862,31 +909,31 @@ function TimelineTab({
               },
             ])
           }
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Milestone
         </button>
       </div>
       {items.map((m) => (
-        <div key={m.id} className="border rounded-lg p-3 space-y-2">
-          <div className="flex gap-2 items-center">
+        <div key={m.id} className={cn('border', 'rounded-lg', 'p-3', 'space-y-2')}>
+          <div className={cn('flex', 'gap-2', 'items-center')}>
             <input
               type="text"
               value={m.year}
               onChange={(e) => update(m.id, { year: e.target.value })}
               placeholder="2026"
-              className="w-20 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('w-20', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
             <input
               type="text"
               value={m.title}
               onChange={(e) => update(m.id, { title: e.target.value })}
               placeholder="LASCADSS 7.0 — Theme Name"
-              className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
             <button
               onClick={() => onChange(items.filter((x) => x.id !== m.id))}
-              className="text-red-500 px-2 text-lg"
+              className={cn('text-red-500', 'px-2', 'text-lg')}
             >
               ×
             </button>
@@ -896,7 +943,7 @@ function TimelineTab({
             value={m.desc}
             onChange={(e) => update(m.id, { desc: e.target.value })}
             placeholder="Description of this edition…"
-            className="w-full rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
       ))}
@@ -924,7 +971,7 @@ function SDGsTab({
   }
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className={cn('flex', 'justify-end')}>
         <button
           onClick={() =>
             onChange([
@@ -938,31 +985,31 @@ function SDGsTab({
               },
             ])
           }
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add SDG
         </button>
       </div>
       {items.map((s) => (
-        <div key={s.id} className="border rounded-lg p-3 space-y-2">
-          <div className="flex gap-2 items-center">
+        <div key={s.id} className={cn('border', 'rounded-lg', 'p-3', 'space-y-2')}>
+          <div className={cn('flex', 'gap-2', 'items-center')}>
             <input
               type="text"
               value={s.num}
               onChange={(e) => update(s.id, { num: e.target.value })}
               placeholder="17"
-              className="w-16 rounded border px-2 py-1.5 text-sm bg-background text-center"
+              className={cn('w-16', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background', 'text-center')}
             />
             <input
               type="text"
               value={s.label}
               onChange={(e) => update(s.id, { label: e.target.value })}
               placeholder="SDG label"
-              className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+              className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
             />
             <button
               onClick={() => onChange(items.filter((x) => x.id !== s.id))}
-              className="text-red-500 px-2 text-lg"
+              className={cn('text-red-500', 'px-2', 'text-lg')}
             >
               ×
             </button>
@@ -972,7 +1019,7 @@ function SDGsTab({
             value={s.desc}
             onChange={(e) => update(s.id, { desc: e.target.value })}
             placeholder="Short description"
-            className="w-full rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
       ))}
@@ -1000,10 +1047,10 @@ function PartnersTab({
   }
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
+      <p className={cn('text-xs', 'text-muted-foreground')}>
         Logo URLs are optional — partners without logos show name-only tiles.
       </p>
-      <div className="flex justify-end">
+      <div className={cn('flex', 'justify-end')}>
         <button
           onClick={() =>
             onChange([
@@ -1011,7 +1058,7 @@ function PartnersTab({
               { id: nanoid(), name: "", order: items.length },
             ])
           }
-          className="px-3 py-1.5 rounded border text-sm hover:bg-muted"
+          className={cn('px-3', 'py-1.5', 'rounded', 'border', 'text-sm', 'hover:bg-muted')}
         >
           + Add Partner
         </button>
@@ -1019,13 +1066,15 @@ function PartnersTab({
       {items.map((p) => (
         <div
           key={p.id}
-          className="border rounded-lg p-3 flex items-center gap-3"
+          className={cn('border', 'rounded-lg', 'p-3', 'flex', 'items-center', 'gap-3')}
         >
           {p.logoUrl && (
             <Image
               src={p.logoUrl}
               alt=""
-              className="h-8 w-16 object-contain rounded border"
+              width={64}
+    height={32}
+              className={cn('h-8', 'w-16', 'object-contain', 'rounded', 'border')}
             />
           )}
           <input
@@ -1033,7 +1082,7 @@ function PartnersTab({
             value={p.name}
             onChange={(e) => update(p.id, { name: e.target.value })}
             placeholder="Partner name"
-            className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
           <input
             type="text"
@@ -1042,17 +1091,779 @@ function PartnersTab({
               update(p.id, { logoUrl: e.target.value || undefined })
             }
             placeholder="Logo URL (optional)"
-            className="flex-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('flex-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
           <button
             onClick={() => onChange(items.filter((x) => x.id !== p.id))}
-            className="text-red-500 px-2 text-lg"
+            className={cn('text-red-500', 'px-2', 'text-lg')}
           >
             ×
           </button>
         </div>
       ))}
       <SaveBar onSave={onSave} saving={saving} saved={saved} />
+    </div>
+  );
+}
+
+// ─── User Picker Modal ────────────────────────────────────────────────────────
+function UserPickerModal({
+  open,
+  onClose,
+  onSelect,
+  eligibleUsers,
+  loadingUsers,
+  alreadyAddedIds,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (user: EligibleUser) => void;
+  eligibleUsers: EligibleUser[];
+  loadingUsers: boolean;
+  alreadyAddedIds: Set<string>;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "moderator">(
+    "all",
+  );
+
+  const filtered = eligibleUsers.filter((u) => {
+    if (alreadyAddedIds.has(u.id)) return false; // already in team
+
+    const matchesRole = roleFilter === "all" || u.role === roleFilter;
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      `${u.fullName.firstname} ${u.fullName.lastname} ${u.email}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+
+    return matchesRole && matchesSearch;
+  });
+
+  if (!open || typeof window === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative bg-background rounded-2xl shadow-2xl border border-border p-6 w-full max-w-lg mx-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-lg">Select Team Member</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Showing admins, webmasters, and committee heads. Already-added
+              members are hidden.
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-muted">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Search + role filter */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or email…"
+            autoFocus
+            className="flex-1 rounded border px-3 py-2 text-sm bg-background"
+          />
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
+            className="rounded border px-2 py-2 text-sm bg-background"
+          >
+            <option value="all">All</option>
+            <option value="admin">Admin</option>
+            <option value="moderator">Moderator</option>
+          </select>
+        </div>
+
+        {/* User list */}
+        <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              Loading eligible users…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <p className="text-sm text-muted-foreground">
+                {eligibleUsers.length === 0
+                  ? "No admin or moderator users found."
+                  : alreadyAddedIds.size > 0 && searchQuery === ""
+                    ? "All eligible users have already been added."
+                    : "No users match your search."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((u) => {
+              const avatarUrl = u.avatar
+                ? typeof u.avatar === "string"
+                  ? u.avatar
+                  : (u.avatar.imageUrl ?? "")
+                : "";
+              const fullName = [
+                u.fullName.firstname,
+                u.fullName.secondname,
+                u.fullName.lastname,
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => {
+                    onSelect(u);
+                    onClose();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted text-left transition-colors"
+                >
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 overflow-hidden shrink-0 flex items-center justify-center">
+                    {avatarUrl ? (
+                      <Image
+                        src={avatarUrl}
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <span className="text-primary text-sm font-black">
+                        {u.fullName.firstname.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {fullName}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {u.email}
+                    </p>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold uppercase tracking-wider">
+                      {u.role}
+                    </span>
+                    {u.committee && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium truncate max-w-[100px]">
+                        {u.committee}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <p className="text-[10px] text-muted-foreground">
+          {filtered.length} of {eligibleUsers.length} eligible users shown
+          {alreadyAddedIds.size > 0 &&
+            ` · ${alreadyAddedIds.size} already added`}
+        </p>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─── Tab: Team ────────────────────────────────────────────────────────────────
+function TeamTab({
+  items,
+  onChange,
+  onSave,
+  saving,
+  saved,
+  ownerId,
+  isWebmaster,
+}: {
+  items: AboutTeamMember[];
+  onChange: (items: AboutTeamMember[]) => void;
+  onSave: () => void;
+  saving: boolean;
+  saved: boolean;
+  ownerId: string;
+  isWebmaster: boolean;
+}) {
+  const { token } = useAuth();
+
+  const { loadUsersMultiRole, users, loadingUsers } = useAdmin();
+
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
+
+  // Set of userIds already in the team — used to filter the picker
+  const alreadyAddedIds = new Set(
+    items.map((m) => m.userId).filter(Boolean) as string[],
+  );
+
+  // ✅ New: derive eligible users from context users array
+  const eligibleUsers: EligibleUser[] = users
+    .filter((u) => {
+      if (u.role === "admin" || u.role === "webmaster") return true;
+      return isHeadPosition(u.committee);
+    })
+    .map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      role: u.role,
+      committee: u.committee,
+      avatar: u.avatar,
+    }));
+
+ function openPicker(memberId: string) {
+   setPickerFor(memberId);
+   if (!hasFetched) {
+     loadUsersMultiRole(["admin", "moderator"], token ?? undefined).finally(
+       () => setHasFetched(true),
+     );
+   }
+ }
+
+  // async function fetchEligibleUsers(tkn: string) {
+  //   setLoadingUsers(true);
+  //   try {
+  //     const headers: HeadersInit = {
+  //       "Content-Type": "application/json",
+  //       Authorization: `Bearer ${tkn}`,
+  //     };
+
+  //     // Fetch admins and moderators separately — route only accepts one role at a time
+  //     const [adminRes, modRes] = await Promise.all([
+  //       fetch("/api/admin/users?role=admin&limit=100&page=1", { headers }),
+  //       fetch("/api/admin/users?role=moderator&limit=100&page=1", { headers }),
+  //     ]);
+
+  //     if (!adminRes.ok)
+  //       throw new Error(`Admin fetch failed: ${adminRes.status}`);
+  //     if (!modRes.ok)
+  //       throw new Error(`Moderator fetch failed: ${modRes.status}`);
+
+  //     const [adminData, modData] = await Promise.all([
+  //       adminRes.json(),
+  //       modRes.json(),
+  //     ]);
+
+  //     const allUsers: EligibleUser[] = [
+  //       ...(adminData.users ?? []),
+  //       ...(modData.users ?? []),
+  //     ];
+
+  //     // Filter: keep admins/webmasters always, plus moderators with head positions
+  //     const filtered = allUsers.filter((u) => {
+  //       if (u.role === "admin" || u.role === "webmaster") return true;
+  //       // Moderators only if they hold a head/lead committee position
+  //       return isHeadPosition(u.committee);
+  //     });
+
+  //     // Deduplicate by id
+  //     const seen = new Set<string>();
+  //     const deduped = filtered.filter((u) => {
+  //       if (seen.has(u.id)) return false;
+  //       seen.add(u.id);
+  //       return true;
+  //     });
+
+  //     setEligibleUsers(deduped);
+  //     setHasFetched(true);
+  //   } catch (err) {
+  //     console.error("[TeamTab] fetchEligibleUsers failed:", err);
+  //   } finally {
+  //     setLoadingUsers(false);
+  //   }
+  // }
+
+  function addBlankMember() {
+    onChange([
+      ...items,
+      {
+        id: nanoid(),
+        displayName: "",
+        professionalTitle: "",
+        shortBio: "",
+        photoUrl: "",
+        tier: "core",
+        visible: true,
+        order: items.length,
+      },
+    ]);
+  }
+
+  function populateFromUser(memberId: string, user: EligibleUser) {
+    const displayName = [
+      user.fullName.firstname,
+      user.fullName.secondname,
+      user.fullName.lastname,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const photoUrl = user.avatar
+      ? typeof user.avatar === "string"
+        ? user.avatar
+        : (user.avatar.imageUrl ?? "")
+      : "";
+
+    // Pre-fill professional title from committee role if available
+    const professionalTitle = user.committee
+      ? `${user.committee}`
+      : user.role.charAt(0).toUpperCase() + user.role.slice(1);
+
+    onChange(
+      items.map((m) =>
+        m.id === memberId
+          ? { ...m, userId: user.id, displayName, photoUrl, professionalTitle }
+          : m,
+      ),
+    );
+  }
+
+  function update(id: string, patch: Partial<AboutTeamMember>) {
+    onChange(items.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
+
+  function remove(id: string) {
+    onChange(items.filter((m) => m.id !== id));
+  }
+
+  if (!isWebmaster) {
+    return (
+      <div
+        className={cn(
+          "flex",
+          "flex-col",
+          "items-center",
+          "justify-center",
+          "py-16",
+          "text-center",
+          "space-y-3",
+        )}
+      >
+        <div
+          className={cn(
+            "w-12",
+            "h-12",
+            "rounded-2xl",
+            "bg-muted",
+            "flex",
+            "items-center",
+            "justify-center",
+            "text-muted-foreground",
+            "text-2xl",
+          )}
+        >
+          🔒
+        </div>
+        <p className={cn("font-bold", "text-foreground")}>
+          Webmaster Access Required
+        </p>
+        <p className={cn("text-sm", "text-muted-foreground", "max-w-xs")}>
+          The team section can only be edited by webmasters to protect the
+          privacy of team members.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className={cn("flex", "items-center", "justify-between")}>
+        <p className={cn("text-sm", "text-muted-foreground")}>
+          Add team members manually or link them to platform users. Only{" "}
+          <strong>visible</strong> members appear on the public About page.
+        </p>
+        <button
+          onClick={addBlankMember}
+          className={cn(
+            "px-3",
+            "py-1.5",
+            "rounded",
+            "border",
+            "text-sm",
+            "hover:bg-muted",
+            "shrink-0",
+          )}
+        >
+          + Add Member
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {items.length === 0 && (
+          <div
+            className={cn(
+              "text-center",
+              "py-10",
+              "text-sm",
+              "text-muted-foreground",
+              "border",
+              "rounded-xl",
+            )}
+          >
+            No team members yet. Click <strong>+ Add Member</strong> to get
+            started.
+          </div>
+        )}
+        {items.map((member) => (
+          <div
+            key={member.id}
+            className={`border rounded-xl p-4 space-y-3 transition-opacity ${!member.visible ? "opacity-50" : ""}`}
+          >
+            {/* Header row */}
+            <div className={cn("flex", "items-center", "justify-between")}>
+              <div className={cn("flex", "items-center", "gap-2")}>
+                {member.photoUrl ? (
+                  <Image
+                    src={member.photoUrl}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className={cn(
+                      "w-8",
+                      "h-8",
+                      "rounded-lg",
+                      "object-cover",
+                      "border",
+                    )}
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      "w-8",
+                      "h-8",
+                      "rounded-lg",
+                      "bg-primary/10",
+                      "flex",
+                      "items-center",
+                      "justify-center",
+                      "text-primary",
+                      "text-xs",
+                      "font-black",
+                    )}
+                  >
+                    {member.displayName.charAt(0).toUpperCase() || "?"}
+                  </div>
+                )}
+                <span
+                  className={cn("text-sm", "font-medium", "text-foreground")}
+                >
+                  {member.displayName || "Unnamed member"}
+                </span>
+                {member.userId && (
+                  <span
+                    className={cn(
+                      "text-[9px]",
+                      "px-1.5",
+                      "py-0.5",
+                      "rounded-full",
+                      "bg-primary/10",
+                      "text-primary",
+                      "font-bold",
+                      "uppercase",
+                      "tracking-wider",
+                    )}
+                  >
+                    Linked
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "text-[9px]",
+                    "px-1.5",
+                    "py-0.5",
+                    "rounded-full",
+                    "bg-muted",
+                    "text-muted-foreground",
+                    "font-medium",
+                    "uppercase",
+                  )}
+                >
+                  {member.tier}
+                </span>
+              </div>
+              <div className={cn("flex", "items-center", "gap-2")}>
+                <button
+                  onClick={() =>
+                    update(member.id, { visible: !member.visible })
+                  }
+                  className={cn(
+                    "text-xs",
+                    "px-2",
+                    "py-1",
+                    "rounded",
+                    "border",
+                    "hover:bg-muted",
+                  )}
+                >
+                  {member.visible ? "Hide" : "Show"}
+                </button>
+                <button
+                  onClick={() => remove(member.id)}
+                  className={cn(
+                    "text-xs",
+                    "px-2",
+                    "py-1",
+                    "rounded",
+                    "border",
+                    "border-red-300",
+                    "text-red-500",
+                    "hover:bg-red-50",
+                  )}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+
+            {/* Link to platform user */}
+            <div
+              className={cn(
+                "p-2.5",
+                "rounded-lg",
+                "bg-muted",
+                "border",
+                "border-border",
+                "flex",
+                "items-center",
+                "justify-between",
+                "gap-3",
+              )}
+            >
+              <div>
+                <p
+                  className={cn(
+                    "text-[10px]",
+                    "font-bold",
+                    "text-muted-foreground",
+                    "uppercase",
+                    "tracking-wider",
+                  )}
+                >
+                  {member.userId
+                    ? "Linked to platform user"
+                    : "Not linked to a platform user"}
+                </p>
+                {member.userId && (
+                  <p
+                    className={cn(
+                      "text-[10px]",
+                      "text-muted-foreground",
+                      "mt-0.5",
+                    )}
+                  >
+                    Name, photo & title were auto-populated. You can still edit
+                    them below.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => openPicker(member.id)}
+                className={cn(
+                  "text-xs",
+                  "px-2.5",
+                  "py-1.5",
+                  "rounded",
+                  "border",
+                  "hover:bg-background",
+                  "whitespace-nowrap",
+                  "shrink-0",
+                )}
+              >
+                {member.userId ? "Change user →" : "Link platform user →"}
+              </button>
+            </div>
+
+            {/* Editable fields */}
+            <div className={cn("grid", "grid-cols-2", "gap-3")}>
+              <div>
+                <label className={cn("text-xs", "text-muted-foreground")}>
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={member.displayName}
+                  onChange={(e) =>
+                    update(member.id, { displayName: e.target.value })
+                  }
+                  placeholder="Full name"
+                  className={cn(
+                    "w-full",
+                    "mt-1",
+                    "rounded",
+                    "border",
+                    "px-2",
+                    "py-1.5",
+                    "text-sm",
+                    "bg-background",
+                  )}
+                />
+              </div>
+              <div>
+                <label className={cn("text-xs", "text-muted-foreground")}>
+                  Professional Title
+                </label>
+                <input
+                  type="text"
+                  value={member.professionalTitle}
+                  onChange={(e) =>
+                    update(member.id, { professionalTitle: e.target.value })
+                  }
+                  placeholder="e.g. Head of Publicity · UX Designer"
+                  className={cn(
+                    "w-full",
+                    "mt-1",
+                    "rounded",
+                    "border",
+                    "px-2",
+                    "py-1.5",
+                    "text-sm",
+                    "bg-background",
+                  )}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={cn("text-xs", "text-muted-foreground")}>
+                Short Bio
+              </label>
+              <textarea
+                rows={2}
+                value={member.shortBio}
+                onChange={(e) =>
+                  update(member.id, { shortBio: e.target.value })
+                }
+                placeholder="One or two sentences about this person…"
+                className={cn(
+                  "w-full",
+                  "mt-1",
+                  "rounded",
+                  "border",
+                  "px-2",
+                  "py-1.5",
+                  "text-sm",
+                  "bg-background",
+                )}
+              />
+            </div>
+
+            <div className={cn("grid", "grid-cols-2", "gap-3")}>
+              <div>
+                <label className={cn("text-xs", "text-muted-foreground")}>
+                  Tier
+                </label>
+                <select
+                  value={member.tier}
+                  onChange={(e) =>
+                    update(member.id, { tier: e.target.value as TeamTier })
+                  }
+                  className={cn(
+                    "w-full",
+                    "mt-1",
+                    "rounded",
+                    "border",
+                    "px-2",
+                    "py-1.5",
+                    "text-sm",
+                    "bg-background",
+                  )}
+                >
+                  <option value="leadership">Leadership</option>
+                  <option value="core">Core Team</option>
+                  <option value="volunteer">Volunteer Team</option>
+                </select>
+              </div>
+              <div>
+                <label className={cn("text-xs", "text-muted-foreground")}>
+                  Photo
+                </label>
+                <div className={cn("flex", "items-center", "gap-2", "mt-1")}>
+                  {member.photoUrl && (
+                    <Image
+                      src={member.photoUrl}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className={cn(
+                        "h-8",
+                        "w-8",
+                        "rounded-lg",
+                        "object-cover",
+                        "border",
+                      )}
+                    />
+                  )}
+                  <button
+                    onClick={() => setUploadFor(member.id)}
+                    className={cn(
+                      "px-2",
+                      "py-1.5",
+                      "rounded",
+                      "border",
+                      "text-xs",
+                      "hover:bg-muted",
+                    )}
+                  >
+                    {member.photoUrl ? "Change" : "Upload Photo"}
+                  </button>
+                  {member.photoUrl && (
+                    <button
+                      onClick={() => update(member.id, { photoUrl: "" })}
+                      className={cn(
+                        "text-xs",
+                        "text-red-500",
+                        "hover:underline",
+                      )}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <SaveBar onSave={onSave} saving={saving} saved={saved} />
+
+      {/* User picker modal */}
+      <UserPickerModal
+        open={pickerFor !== null}
+        onClose={() => setPickerFor(null)}
+        eligibleUsers={eligibleUsers}
+        loadingUsers={loadingUsers}
+        alreadyAddedIds={alreadyAddedIds}
+        onSelect={(user) => {
+          if (pickerFor) populateFromUser(pickerFor, user);
+          setPickerFor(null);
+        }}
+      />
+
+      {/* Photo upload modal */}
+      <PhotoUploadModal
+        open={uploadFor !== null}
+        onClose={() => setUploadFor(null)}
+        ownerId={ownerId}
+        onUploaded={(url) => {
+          if (uploadFor) update(uploadFor, { photoUrl: url });
+          setUploadFor(null);
+        }}
+      />
     </div>
   );
 }
@@ -1082,59 +1893,59 @@ function CTATab({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-muted-foreground">Heading</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Heading</label>
         <input
           type="text"
           value={d.heading}
           onChange={(e) => onChange({ ...d, heading: e.target.value })}
           placeholder="Ready to shape your future?"
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Subtitle</label>
+        <label className={cn('text-xs', 'text-muted-foreground')}>Subtitle</label>
         <textarea
           rows={3}
           value={d.subtitle}
           onChange={(e) => onChange({ ...d, subtitle: e.target.value })}
-          className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+          className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
         />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className={cn('grid', 'grid-cols-2', 'gap-4')}>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 1 Label</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 1 Label</label>
           <input
             type="text"
             value={d.cta1Label}
             onChange={(e) => onChange({ ...d, cta1Label: e.target.value })}
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 1 Link</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 1 Link</label>
           <input
             type="text"
             value={d.cta1Href}
             onChange={(e) => onChange({ ...d, cta1Href: e.target.value })}
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 2 Label</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 2 Label</label>
           <input
             type="text"
             value={d.cta2Label}
             onChange={(e) => onChange({ ...d, cta2Label: e.target.value })}
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">CTA 2 Link</label>
+          <label className={cn('text-xs', 'text-muted-foreground')}>CTA 2 Link</label>
           <input
             type="text"
             value={d.cta2Href}
             onChange={(e) => onChange({ ...d, cta2Href: e.target.value })}
-            className="w-full mt-1 rounded border px-2 py-1.5 text-sm bg-background"
+            className={cn('w-full', 'mt-1', 'rounded', 'border', 'px-2', 'py-1.5', 'text-sm', 'bg-background')}
           />
         </div>
       </div>

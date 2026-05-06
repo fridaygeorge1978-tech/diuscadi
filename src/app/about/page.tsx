@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import {
   Users,
@@ -22,6 +22,12 @@ import {
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import mentor from "@/assets/img/downloads/Dr-Ikechukwu-Umeh-1440x1920.webp";
+import { AboutTeamMember, TeamTier } from "@/lib/models/aboutPageConfig";
+
+// ─── Config shape for fetched data ───────────────────────────────────────────
+interface AboutConfig {
+  team?: { items: AboutTeamMember[] };
+}
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -225,9 +231,75 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function TeamCard({ member }: { member: AboutTeamMember }) {
+  const inner = (
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="glass rounded-2xl p-4 text-center space-y-2 h-full flex flex-col items-center"
+    >
+      {/* Avatar */}
+      <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-muted shrink-0">
+        {member.photoUrl ? (
+          <Image
+            src={member.photoUrl}
+            alt={member.displayName}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-xl font-black">
+            {member.displayName.charAt(0).toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      {/* Name + title */}
+      <div className="space-y-0.5 flex-1">
+        <p className="text-sm font-bold text-foreground leading-tight">
+          {member.displayName}
+        </p>
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          {member.professionalTitle}
+        </p>
+      </div>
+
+      {/* Bio — only shown if non-empty */}
+      {member.shortBio && (
+        <p className="text-[10px] text-muted-foreground/70 leading-relaxed line-clamp-2">
+          {member.shortBio}
+        </p>
+      )}
+    </motion.div>
+  );
+
+  // If linked to a platform user, wrap in a link to their profile page
+  if (member.userId) {
+    return (
+      <a href={`/users/${member.userId}`} className="block h-full">
+        {inner}
+      </a>
+    );
+  }
+
+  return <div className="h-full">{inner}</div>;
+}
+
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 
 export default function AboutPage() {
+  const [config, setConfig] = useState<AboutConfig>({});
+
+  useEffect(() => {
+    fetch("/api/public/about")
+      .then((r) => r.json())
+      .then(setConfig)
+      .catch(console.error);
+  }, []);
+
+  const team = config?.team?.items ?? [];
+  const visibleTeam = team.filter((m: AboutTeamMember) => m.visible);
+  
   return (
     <main className="min-h-screen pt-28 pb-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-32">
       {/* ── Hero ── */}
@@ -535,6 +607,45 @@ export default function AboutPage() {
           </div>
         </FadeIn>
       </section>
+
+      {/* ── Team ── */}
+      {visibleTeam.length > 0 && (
+        <section className="space-y-10">
+          <FadeIn className="text-center space-y-2">
+            <SectionLabel>The People Behind DIUSCADI</SectionLabel>
+            <h2 className="text-3xl md:text-4xl font-bold">Our Team</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto text-sm">
+              The dedicated individuals who make DIUSCADI&apos;s mission a reality.
+            </p>
+          </FadeIn>
+
+          {(["leadership", "core", "volunteer"] as TeamTier[]).map((tier) => {
+            const members = visibleTeam.filter((m) => m.tier === tier);
+            if (members.length === 0) return null;
+
+            const tierLabel: Record<TeamTier, string> = {
+              leadership: "Leadership",
+              core: "Core Team",
+              volunteer: "Volunteer Team",
+            };
+
+            return (
+              <div key={tier} className="space-y-4">
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground pl-1">
+                  {tierLabel[tier]}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {members.map((member, i) => (
+                    <FadeIn key={member.id} delay={i * 0.05}>
+                      <TeamCard member={member} />
+                    </FadeIn>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {/* ── CTA ── */}
       <FadeIn>
