@@ -43,6 +43,12 @@ export default function EditProfilePage() {
       path: "DEVELOPER",
       // image is a display URL string — extract from CloudinaryImage or use null
       image: profile?.hasAvatar ? (profile.avatar?.imageUrl ?? null) : null,
+      socials: {
+        linkedin: profile?.socials?.linkedin ?? "",
+        github: profile?.socials?.github ?? "",
+        twitter: profile?.socials?.twitter ?? "",
+        website: profile?.socials?.portfolio ?? "", // portfolio in DB → website in form
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — seed once on mount, user edits control state after
@@ -68,6 +74,12 @@ export default function EditProfilePage() {
         lastname: formData.lastName.trim() || profile.fullName.lastname,
       },
       bio: formData.bio,
+      socials: {
+        linkedin: formData.socials.linkedin || undefined,
+        github: formData.socials.github || undefined,
+        twitter: formData.socials.twitter || undefined,
+        portfolio: formData.socials.website || undefined,
+      },
     });
 
     setIsSaving(false);
@@ -151,7 +163,16 @@ export default function EditProfilePage() {
               <ContactInfoSection />
             </div>
             <div id="social" onChange={() => setHasChanges(true)}>
-              <SocialLinksSection />
+              <SocialLinksSection
+                links={formData.socials}
+                onChange={(patch) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    socials: { ...prev.socials, ...patch },
+                  }));
+                  setHasChanges(true);
+                }}
+              />
             </div>
             <div id="prefs" onChange={() => setHasChanges(true)}>
               <PreferencesSection />

@@ -110,6 +110,12 @@ interface UserContextType {
     bio?: string;
     phone?: PhoneNumber;
     location?: UserLocation; // ← ADDED
+     socials?: {           // ✅ add this
+    linkedin?: string;
+    github?: string;
+    twitter?: string;
+    portfolio?: string;
+  };
   }) => Promise<UpdateResult>;
   updateInstitution: (data: Partial<Institution>) => Promise<UpdateResult>;
   updateSkills: (skills: Skill[]) => Promise<UpdateResult>;
@@ -283,6 +289,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       bio?: string;
       phone?: PhoneNumber;
       location?: UserLocation;
+      socials?: {
+        linkedin?: string;
+        github?: string;
+        twitter?: string;
+        portfolio?: string;
+      };
     }) =>
       callPatch(
         "/api/users/profile",

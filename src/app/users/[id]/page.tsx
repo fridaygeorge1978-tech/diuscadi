@@ -15,6 +15,7 @@ import {
   Briefcase,
   Zap,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,32 +25,33 @@ import Image from "next/image";
 interface MemberProfile {
   id: string;
   fullName: { firstname: string; secondname?: string; lastname?: string };
-  avatar: { imageUrl?: string } | string | null;
-  role: string;
-  eduStatus: string;
-  membershipStatus: string;
-  committeeMembership: { committee?: string; role?: string } | null;
-  skills: string[];
-  verifiedSkills: string[];
-  profile: {
-    bio?: string;
-    headline?: string;
+  avatar: { imageUrl?: string; imageCloudName?: string } | string | null;
+  role?: string;
+  eduStatus?: string;
+  membershipStatus?: string;
+  committeeMembership?: { committee?: string; role?: string } | null;
+  skills?: string[];
+  verifiedSkills?: string[];
+  profile?: { bio?: string; headline?: string } | null;
+  email?: string;
+  phone?: { countryCode?: number; phoneNumber?: number };
+  location?: { country?: string; state?: string; city?: string; lga?: string };
+  socials?: {
     twitter?: string;
     github?: string;
-    website?: string;
-  } | null;
-  email?: string;
-  phone?: string;
-  location?: string;
-  socials?: { twitter?: string; github?: string; website?: string };
+    portfolio?: string;
+    linkedin?: string;
+  };
   institution?: {
     name?: string;
     abbreviation?: string;
     faculty?: string;
     department?: string;
     level?: string;
+    currentStatus?: string;
   } | null;
-  createdAt: string;
+  createdAt?: string;
+  isPrivate?: boolean;
 }
 
 function resolveAvatarUrl(avatar: MemberProfile["avatar"]): string | null {
@@ -58,14 +60,71 @@ function resolveAvatarUrl(avatar: MemberProfile["avatar"]): string | null {
   return avatar.imageUrl ?? null;
 }
 
+// ── Private profile wall ──────────────────────────────────────────────────────
+function PrivateProfileWall({ profile }: { profile: MemberProfile }) {
+  const avatarUrl = resolveAvatarUrl(profile.avatar);
+  const displayName = [
+    profile.fullName.firstname,
+    profile.fullName.secondname,
+    profile.fullName.lastname,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <main className="min-h-screen pb-20">
+      <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-primary/20 via-primary/5 to-background">
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+      </div>
+
+      <div className="max-w-2xl mx-auto px-6 -mt-24 relative z-10 flex flex-col items-center text-center">
+        {/* Avatar */}
+        <div className="relative w-32 h-32 mb-6">
+          {avatarUrl ? (
+            <Image
+              src={avatarUrl}
+              width={128}
+              height={128}
+              className="w-full h-full rounded-3xl object-cover border-4 border-background shadow-2xl"
+              alt={displayName}
+            />
+          ) : (
+            <div className="w-full h-full rounded-3xl border-4 border-background shadow-2xl bg-primary/10 flex items-center justify-center text-primary text-4xl font-black">
+              {profile.fullName.firstname.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {/* Lock overlay */}
+          <div className="absolute -bottom-2 -right-2 bg-muted border border-border text-muted-foreground p-1.5 rounded-xl shadow-lg">
+            <Lock size={18} />
+          </div>
+        </div>
+
+        <h1 className="text-2xl font-black tracking-tight">{displayName}</h1>
+
+        <div className="mt-6 glass p-8 rounded-[2rem] space-y-3 w-full">
+          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+            <Lock size={22} className="text-muted-foreground" />
+          </div>
+          <p className="font-black text-foreground">This profile is private</p>
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
+            This user has set their account to private. Only people with a
+            direct link shared by the user can view their full profile.
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [viewerRole, setViewerRole] = useState<string>("public");
-  // Initialize loading to true if we have an ID to avoid the sync setState in useEffect
-  const [loading, setLoading] = useState(!!id);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,28 +132,29 @@ export default function ProfilePage() {
 
     let isMounted = true;
 
-    // Prevents the cascading render by checking state before updating
-    setError((prev) => (prev !== null ? null : prev));
+    // Fix: Use functional updates to prevent cascading render warnings
+    // Only update state if it isn't already at the target value
+    setLoading((prev) => (prev ? prev : true));
+    setError((prev) => (prev === null ? prev : null));
 
     const fetchProfile = async () => {
       try {
         const res = await fetch(`/api/member/${id}`);
+        const data = await res.json();
 
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error ?? "Failed to load profile");
         }
-
-        const data = await res.json();
 
         if (isMounted) {
           setProfile(data.profile);
           setViewerRole(data.viewerRole);
+          setIsPrivate(data.isPrivate ?? false);
           setLoading(false);
         }
       } catch (err) {
         if (isMounted) {
-          // Type guard: check if err is an actual Error object
+          // TypeScript Guard: safely handle 'unknown' error type
           if (err instanceof Error) {
             setError(err.message);
           } else {
@@ -110,7 +170,7 @@ export default function ProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, setViewerRole]);
 
   if (loading) {
     return (
@@ -131,6 +191,10 @@ export default function ProfilePage() {
     );
   }
 
+  // Show private wall for non-admins/non-owners
+  if (isPrivate) return <PrivateProfileWall profile={profile} />;
+
+  // ── Full profile ──────────────────────────────────────────────────────────
   const avatarUrl = resolveAvatarUrl(profile.avatar);
   const displayName = [
     profile.fullName.firstname,
@@ -147,36 +211,42 @@ export default function ProfilePage() {
     moderator: "text-blue-500 bg-blue-500/10",
   };
 
+  const skills = profile.skills ?? [];
+  const verifiedSkills = profile.verifiedSkills ?? [];
+
   const stats = [
-    {
-      label: "Skills",
-      value: profile.skills.length.toString(),
-      icon: Briefcase,
-    },
-    {
-      label: "Verified",
-      value: profile.verifiedSkills.length.toString(),
-      icon: Award,
-    },
+    { label: "Skills", value: skills.length.toString(), icon: Briefcase },
+    { label: "Verified", value: verifiedSkills.length.toString(), icon: Award },
     {
       label: "Member since",
-      value: new Date(profile.createdAt).getFullYear().toString(),
+      value: profile.createdAt
+        ? new Date(profile.createdAt).getFullYear().toString()
+        : "—",
       icon: Zap,
     },
   ];
 
-  const socials = profile.socials ?? {};
-  const website = socials.website ?? profile.profile?.website;
-  const twitter = socials.twitter ?? profile.profile?.twitter;
-  const github = socials.github ?? profile.profile?.github;
+  const twitter = profile.socials?.twitter;
+  const github = profile.socials?.github;
+  const website = profile.socials?.portfolio;
   const bio = profile.profile?.bio;
   const headline =
     profile.profile?.headline ??
     profile.committeeMembership?.role ??
     profile.role;
 
-  // Example of using viewerRole to fix the "unused" error:
-  const isAdmin = viewerRole === "admin";
+  // Format location
+  const locationParts = [
+    profile.location?.city,
+    profile.location?.state,
+    profile.location?.country,
+  ].filter(Boolean);
+  const locationStr = locationParts.join(", ");
+
+  // Format phone
+  const phoneStr = profile.phone?.phoneNumber
+    ? `+${profile.phone.countryCode ?? ""} ${profile.phone.phoneNumber}`
+    : null;
 
   return (
     <main className="min-h-screen pb-20">
@@ -207,7 +277,7 @@ export default function ProfilePage() {
                   {profile.fullName.firstname.charAt(0).toUpperCase()}
                 </div>
               )}
-              {profile.verifiedSkills.length > 0 && (
+              {verifiedSkills.length > 0 && (
                 <div className="absolute -bottom-2 -right-2 bg-primary text-white p-1.5 rounded-xl shadow-lg">
                   <BadgeCheck size={20} />
                 </div>
@@ -221,34 +291,39 @@ export default function ProfilePage() {
               {headline && (
                 <p className="text-sm text-muted-foreground">{headline}</p>
               )}
-              <Badge
-                className={`uppercase text-[10px] tracking-widest px-3 py-1 ${typeColors[profile.role] ?? "text-gray-500 bg-gray-500/10"}`}
-              >
-                {profile.membershipStatus === "approved"
-                  ? "member"
-                  : profile.role}
-              </Badge>
+              {profile.role && (
+                <Badge
+                  className={`uppercase text-[10px] tracking-widest px-3 py-1 ${typeColors[profile.role] ?? "text-gray-500 bg-gray-500/10"}`}
+                >
+                  {profile.membershipStatus === "approved"
+                    ? "member"
+                    : profile.role}
+                </Badge>
+              )}
               {bio && (
                 <p className="text-sm text-muted-foreground pt-2">{bio}</p>
               )}
             </div>
 
             <div className="mt-6 space-y-3 pt-6 border-t border-border/50">
-              {profile.location && (
+              {locationStr && (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <MapPin size={16} className="text-primary" />
-                  {profile.location}
+                  <MapPin size={16} className="text-primary shrink-0" />
+                  <span>{locationStr}</span>
                 </div>
               )}
               {profile.institution?.name && (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Briefcase size={16} className="text-primary" />
-                  {profile.institution.abbreviation ?? profile.institution.name}
+                  <Briefcase size={16} className="text-primary shrink-0" />
+                  <span>
+                    {profile.institution.abbreviation ??
+                      profile.institution.name}
+                  </span>
                 </div>
               )}
               {website && (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <LinkIcon size={16} className="text-primary" />
+                  <LinkIcon size={16} className="text-primary shrink-0" />
                   <a
                     href={website}
                     target="_blank"
@@ -261,14 +336,20 @@ export default function ProfilePage() {
               )}
               {profile.email && (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Mail size={16} className="text-primary" />
+                  <Mail size={16} className="text-primary shrink-0" />
                   <span className="truncate">{profile.email}</span>
+                </div>
+              )}
+              {phoneStr && (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <Users size={16} className="text-primary shrink-0" />
+                  <span>{phoneStr}</span>
                 </div>
               )}
             </div>
 
             {(twitter || github || website) && (
-              <div className="grid grid-cols-3 gap-2 mt-8">
+              <div className="flex gap-2 mt-8 flex-wrap">
                 {twitter && (
                   <Button
                     size="icon"
@@ -402,20 +483,28 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   )}
+                  {profile.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin size={16} className="text-primary" />
+                      <span className="text-sm text-muted-foreground">
+                        {locationStr}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {profile.skills.length > 0 && (
+                {skills.length > 0 && (
                   <div className="glass p-8 rounded-[2rem] space-y-4">
                     <h3 className="font-bold text-lg">Technical Expertise</h3>
                     <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((skill) => (
+                      {skills.map((skill) => (
                         <Badge
                           key={skill}
                           variant="secondary"
-                          className={`glass px-4 py-1.5 rounded-lg border-none ${profile.verifiedSkills.includes(skill) ? "ring-1 ring-primary/40" : ""}`}
+                          className={`glass px-4 py-1.5 rounded-lg border-none ${verifiedSkills.includes(skill) ? "ring-1 ring-primary/40" : ""}`}
                         >
                           {skill}
-                          {profile.verifiedSkills.includes(skill) && (
+                          {verifiedSkills.includes(skill) && (
                             <BadgeCheck
                               size={12}
                               className="ml-1 text-primary inline"

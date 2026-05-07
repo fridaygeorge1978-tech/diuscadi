@@ -7,8 +7,9 @@ import { Collections } from "@/lib/db/collections";
 import { verifyJWT } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
+import { DEFAULT_PREFERENCES, UserPreferences, Visibility } from "@/types/domain";
 
-type Visibility = "public" | "members" | "private";
+// type Visibility = "public" | "members" | "private";
 type ViewerRole = "public" | "participant" | "member" | "admin";
 
 function resolveViewerRole(
@@ -30,6 +31,34 @@ function canSee(setting: Visibility, viewer: ViewerRole): boolean {
   )
     return true;
   return false;
+}
+
+// ── Normalise old shape → new shape ──────────────────────────────────────────
+// Old: { profilePrivate, showEmail, showPhone }
+// New: { profileVisibility, fieldPermissions: { email, phone, location, socials, academic } }
+// Change signature to use your actual Type
+function normalisePrivacy(prefs: UserPreferences) {
+  const privacy = prefs.privacy;
+
+  // We check if the NEW fields exist
+  if (privacy.profileVisibility && privacy.fieldPermissions) {
+    return {
+      profileVisibility: privacy.profileVisibility,
+      fieldPermissions: privacy.fieldPermissions as Record<string, Visibility>,
+    };
+  }
+
+  // Fallback to legacy migration (using the optional keys we added to the interface)
+  return {
+    profileVisibility: (privacy.profilePrivate ? "private" : "members") as Visibility,
+    fieldPermissions: {
+      email:    (privacy.showEmail ? "members" : "private") as Visibility,
+      phone:    (privacy.showPhone ? "members" : "private") as Visibility,
+      location: "private" as Visibility,
+      socials:  "members" as Visibility,
+      academic: "private" as Visibility,
+    },
+  };
 }
 
 type Context = {
@@ -70,6 +99,7 @@ export async function GET(req: Request, context?: Context) {
 
     // Determine viewer role from cookie
     let viewerRole: ViewerRole = "public";
+    let viewerId: string | null = null;
     try {
       const cookieStore = await cookies();
       const token = cookieStore.get("diuscadi_token")?.value;
@@ -84,14 +114,38 @@ export async function GET(req: Request, context?: Context) {
             viewerData?.membershipStatus,
             viewerData?.role ?? payload.role,
           );
+          viewerId = viewerData?._id?.toString() ?? null;
         }
       }
     } catch {
       /* unauthenticated */
     }
 
-    const fp = userData.preferences?.privacy?.fieldPermissions ?? {};
+    const isOwnProfile = viewerId === userData._id!.toString();
 
+    // Inside your GET function
+    const { profileVisibility, fieldPermissions } = normalisePrivacy(
+      userData.preferences ?? DEFAULT_PREFERENCES,
+    );
+
+    // ── Private profile guard ─────────────────────────────────────────────────
+    // Admins and the owner always bypass this
+    const isPrivate = profileVisibility === "private";
+    if (isPrivate && viewerRole !== "admin" && !isOwnProfile) {
+      // Return minimal profile with private flag
+      return NextResponse.json({
+        profile: {
+          id: userData._id!.toString(),
+          fullName: userData.fullName,
+          avatar: userData.avatar ?? null,
+          isPrivate: true,
+        },
+        viewerRole,
+        isPrivate: true,
+      });
+    }
+
+    // ── Build full profile with field-level privacy ───────────────────────────
     const profile: Record<string, unknown> = {
       id: userData._id!.toString(),
       fullName: userData.fullName,
@@ -105,17 +159,15 @@ export async function GET(req: Request, context?: Context) {
       verifiedSkills: userData.verifiedSkills ?? [],
       profile: userData.profile ?? null,
       createdAt: userData.createdAt,
+      isPrivate: false,
     };
 
-    if (canSee(fp.phone ?? "private", viewerRole))
-      profile.phone = userData.phone;
-    if (canSee(fp.email ?? "members", viewerRole))
+    // Owner sees everything regardless of field settings
+    if (isOwnProfile) {
       profile.email = userData.email;
-    if (canSee(fp.location ?? "private", viewerRole))
+      profile.phone = userData.phone;
       profile.location = userData.location;
-    if (canSee(fp.socials ?? "members", viewerRole))
       profile.socials = userData.socials;
-    if (canSee(fp.academic ?? "private", viewerRole)) {
       profile.institution = userData.Institution
         ? {
             name: userData.Institution.name,
@@ -128,9 +180,34 @@ export async function GET(req: Request, context?: Context) {
             currentStatus: userData.Institution.currentStatus,
           }
         : null;
+    } else {
+      // Apply field-level permissions for other viewers
+      const fp = fieldPermissions;
+      if (canSee((fp.email ?? "members") as Visibility, viewerRole))
+        profile.email = userData.email;
+      if (canSee((fp.phone ?? "private") as Visibility, viewerRole))
+        profile.phone = userData.phone;
+      if (canSee((fp.location ?? "private") as Visibility, viewerRole))
+        profile.location = userData.location;
+      if (canSee((fp.socials ?? "members") as Visibility, viewerRole))
+        profile.socials = userData.socials;
+      if (canSee((fp.academic ?? "private") as Visibility, viewerRole)) {
+        profile.institution = userData.Institution
+          ? {
+              name: userData.Institution.name,
+              abbreviation: userData.Institution.abbreviation,
+              type: userData.Institution.Type,
+              faculty: userData.Institution.faculty,
+              department: userData.Institution.department,
+              degreeType: userData.Institution.degreeType,
+              level: userData.Institution.level,
+              currentStatus: userData.Institution.currentStatus,
+            }
+          : null;
+      }
     }
 
-    return NextResponse.json({ profile, viewerRole });
+    return NextResponse.json({ profile, viewerRole, isPrivate: false });
   } catch (err) {
     console.error("[GET /api/member/[id]]", err);
     return NextResponse.json(

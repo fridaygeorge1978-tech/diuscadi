@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LuShare2,
@@ -13,14 +13,13 @@ import {
 import { IconType } from "react-icons";
 import { cn } from "../../../../lib/utils";
 
-// Define proper TypeScript types
 type SocialPlatform = "linkedin" | "github" | "twitter" | "website";
 
-interface SocialLinks {
+export interface SocialLinks {
   linkedin: string;
   github: string;
   twitter: string;
-  website: string;
+  website: string; // maps to "portfolio" in DB — translation happens in page
 }
 
 interface SocialInputConfig {
@@ -32,7 +31,6 @@ interface SocialInputConfig {
 
 type ValidationResult = boolean | null;
 
-// 1. Validation Logic
 const validateUrl = (
   url: string,
   platform: SocialPlatform,
@@ -47,14 +45,15 @@ const validateUrl = (
   return patterns[platform].test(url);
 };
 
-export const SocialLinksSection = () => {
-  const [links, setLinks] = useState<SocialLinks>({
-    linkedin: "",
-    github: "",
-    twitter: "",
-    website: "",
-  });
+interface SocialLinksSectionProps {
+  links: SocialLinks;
+  onChange: (patch: Partial<SocialLinks>) => void;
+}
 
+export const SocialLinksSection = ({
+  links,
+  onChange,
+}: SocialLinksSectionProps) => {
   const socialInputs: SocialInputConfig[] = [
     {
       id: "linkedin",
@@ -107,11 +106,7 @@ export const SocialLinksSection = () => {
           {label}
         </label>
         <div className={cn("relative", "group")}>
-          <motion.div
-            animate={links[id] ? { scale: [1, 1.2, 1] } : {}}
-            transition={{
-              duration: 0.3,
-            }}
+          <div
             className={cn(
               "absolute",
               "left-6",
@@ -122,13 +117,13 @@ export const SocialLinksSection = () => {
               "transition-colors",
             )}
           >
-            <Icon className={cn('w-4', 'h-4')} />
-          </motion.div>
+            <Icon className="w-4 h-4" />
+          </div>
 
           <motion.input
             type="url"
             value={links[id]}
-            onChange={(e) => setLinks({ ...links, [id]: e.target.value })}
+            onChange={(e) => onChange({ [id]: e.target.value })}
             placeholder={placeholder}
             whileFocus={{ scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -165,28 +160,21 @@ export const SocialLinksSection = () => {
                   exit={{ scale: 0, rotate: 180 }}
                   transition={{ type: "spring", stiffness: 300, damping: 15 }}
                 >
-                  <LuCircleCheck
-                    className={cn("w-4", "h-4", "text-emerald-500")}
-                  />
+                  <LuCircleCheck className="w-4 h-4 text-emerald-500" />
                 </motion.div>
               )}
               {isValid === false && (
                 <motion.div
                   key="invalid"
                   initial={{ scale: 0 }}
-                  animate={{
-                    scale: 1,
-                    x: [0, -2, 2, -2, 2, 0],
-                  }}
+                  animate={{ scale: 1, x: [0, -2, 2, -2, 2, 0] }}
                   exit={{ scale: 0 }}
                   transition={{
                     scale: { type: "spring", stiffness: 300, damping: 15 },
                     x: { duration: 0.4 },
                   }}
                 >
-                  <LuCircleAlert
-                    className={cn("w-4", "h-4", "text-rose-500")}
-                  />
+                  <LuCircleAlert className="w-4 h-4 text-rose-500" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -203,7 +191,7 @@ export const SocialLinksSection = () => {
       transition={{ duration: 0.5 }}
       whileHover={{ borderColor: "rgba(251, 146, 60, 0.2)" }}
       className={cn(
-        "bg-backgroundround",
+        "bg-background",
         "border-2",
         "border-border",
         "rounded-[2.5rem]",
@@ -237,13 +225,9 @@ export const SocialLinksSection = () => {
         >
           <motion.div
             animate={{ rotate: [0, 15, -15, 0] }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              repeatDelay: 3,
-            }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
           >
-            <LuShare2 className={cn("w-5", "h-5")} />
+            <LuShare2 className="w-5 h-5" />
           </motion.div>
         </motion.div>
         <div>
@@ -287,10 +271,4 @@ export const SocialLinksSection = () => {
   );
 };
 
-// Export types for reuse
-export type {
-  SocialPlatform,
-  SocialLinks,
-  SocialInputConfig,
-  ValidationResult,
-};
+export type { SocialPlatform, SocialInputConfig, ValidationResult };

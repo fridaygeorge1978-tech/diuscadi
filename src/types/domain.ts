@@ -83,8 +83,14 @@ export interface PrivacyPreferences {
     location: "public" | "members" | "private";
     socials: "public" | "members" | "private";
     academic: "public" | "members" | "private"; // For CGPA/Level
-  }
+  };
+  // Add these as optional legacy fields to support migration logic
+  profilePrivate?: boolean;
+  showEmail?: boolean;
+  showPhone?: boolean;
 }
+
+export type Visibility = "public" | "members" | "private";
 
 export interface UserPreferences {
   notifications: NotificationPreferences;
