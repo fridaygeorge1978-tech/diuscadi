@@ -50,6 +50,10 @@ const MEMBER_LINKS = [
   { name: "Tickets", href: "/tickets" },
   { name: "Profile", href: "/profile" },
   { name: "Apply", href: "/profile/applications" },
+  { name: "Landing Page", href: "/" },
+  { name: "About", href: "/about" },
+  { name: "Gallery", href: "/gallery" },
+  { name: "Contact", href: "/contact" },
   { name: "Settings", href: "/settings" },
 ];
 

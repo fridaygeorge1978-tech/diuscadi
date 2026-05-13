@@ -73,7 +73,7 @@ export const Hero = () => {
             )}
           >
             <GraduationCap className={cn("w-4", "h-4")} />
-            <span>LASCADSS — Now in its 6th Edition</span>
+            <span>LASCADSS — Now in its 7th Edition</span>
           </div>
 
           <h1

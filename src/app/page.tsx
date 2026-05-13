@@ -22,21 +22,21 @@ import { CTA } from "@/components/sections/CTA";
 import { Newsletter } from "@/components/sections/newsletter";
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { isAuthenticated, sessionStatus } = useAuth();
+  // const router = useRouter();
+  // const { isAuthenticated, sessionStatus } = useAuth();
 
-  useEffect(() => {
-    // Wait until auth resolves before redirecting
-    if (sessionStatus === "restored" && isAuthenticated) {
-      router.replace("/home");
-    }
-  }, [sessionStatus, router, isAuthenticated]);
+  // useEffect(() => {
+  //   // Wait until auth resolves before redirecting
+  //   if (sessionStatus === "restored" && isAuthenticated) {
+  //     router.replace("/home");
+  //   }
+  // }, [sessionStatus, router, isAuthenticated]);
 
-  // Show nothing while auth is resolving to prevent flash
-  if (sessionStatus === "pending") return null;
+  // // Show nothing while auth is resolving to prevent flash
+  // if (sessionStatus === "pending") return null;
 
-  // Authenticated — redirect in progress, don't flash landing page
-  if (isAuthenticated) return null;
+  // // Authenticated — redirect in progress, don't flash landing page
+  // if (isAuthenticated) return null;
 
   return (
     <main
