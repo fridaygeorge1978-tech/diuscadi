@@ -265,3 +265,58 @@ export async function sendMembershipWelcomeEmail(
   });
   await prodSend({ to: opts.to, subject, html, text });
 }
+
+// ─── 9. Contact form — internal notification ──────────────────────────────────
+
+export async function sendContactEnquiryEmail(opts: {
+  senderName: string;
+  senderEmail: string;
+  organisation?: string;
+  enquiryType: string;
+  subject: string;
+  message: string;
+}): Promise<void> {
+  if (IS_DEV) {
+    console.log(`[DEV EMAIL] Contact enquiry → DIUSCADI inbox`);
+    console.log(`  From:    ${opts.senderName} <${opts.senderEmail}>`);
+    console.log(`  Type:    ${opts.enquiryType}`);
+    console.log(`  Subject: ${opts.subject}`);
+    console.log(`  Message: ${opts.message.slice(0, 80)}...`);
+    return;
+  }
+
+  const { contactEnquiryEmail } = await import("@/lib/MailTemplate");
+  const { subject, html, text } = contactEnquiryEmail(opts);
+  await prodSend({
+    to: process.env.CONTACT_INBOX_EMAIL ?? "info@diuscadi.org.ng",
+    subject,
+    html,
+    text,
+  });
+}
+
+// ─── 10. Contact form — auto-reply to sender ──────────────────────────────────
+
+export async function sendContactAutoReplyEmail(opts: {
+  to: string;
+  senderName: string;
+  enquiryType: string;
+  subject: string;
+  message: string;
+}): Promise<void> {
+  if (IS_DEV) {
+    console.log(`[DEV EMAIL] Contact auto-reply → ${opts.to}`);
+    console.log(`  Name:    ${opts.senderName}`);
+    console.log(`  Subject: ${opts.subject}`);
+    return;
+  }
+
+  const { contactAutoReplyEmail } = await import("@/lib/MailTemplate");
+  const { subject, html, text } = contactAutoReplyEmail({
+    senderName: opts.senderName,
+    enquiryType: opts.enquiryType,
+    subject: opts.subject,
+    message: opts.message,
+  });
+  await prodSend({ to: opts.to, subject, html, text });
+}

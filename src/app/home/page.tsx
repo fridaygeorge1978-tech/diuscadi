@@ -62,27 +62,27 @@ export default async function HomePage() {
   const activities = getStaticActivities();
   const continueItems = getStaticContinueItems();
 
-  const headerUser = homeUser
-    ? {
-        name: homeUser.name,
-        avatar: homeUser.avatar,
-        status:
-          homeUser.eduStatus.charAt(0).toUpperCase() +
-          homeUser.eduStatus.slice(1).toLowerCase(),
-        skill: homeUser.skills[0] ?? "",
-        interest: homeUser.committeeMembership?.committee ?? "General",
-        projectsParticipated: String(homeUser.eventsAttended),
-        points: homeUser.eventsRegistered * 50,
-      }
-    : {
-        name: "Member",
-        avatar: "",
-        status: "",
-        skill: "",
-        interest: "",
-        projectsParticipated: "0",
-        points: 0,
-      };
+  // const headerUser = homeUser
+  //   ? {
+  //       name: homeUser.name,
+  //       avatar: homeUser.avatar,
+  //       status:
+  //         homeUser.eduStatus.charAt(0).toUpperCase() +
+  //         homeUser.eduStatus.slice(1).toLowerCase(),
+  //       skill: homeUser.skills[0] ?? "",
+  //       interest: homeUser.committeeMembership?.committee ?? "General",
+  //       projectsParticipated: String(homeUser.eventsAttended),
+  //       points: homeUser.eventsRegistered * 50,
+  //     }
+  //   : {
+  //       name: "Member",
+  //       avatar: "",
+  //       status: "",
+  //       skill: "",
+  //       interest: "",
+  //       projectsParticipated: "0",
+  //       points: 0,
+  //     };
 
   const heroEvent = featuredEvent
     ? {
@@ -145,7 +145,7 @@ export default async function HomePage() {
         "h-full",
       )}
     >
-      <HomeHeader user={headerUser} />
+      <HomeHeader />
       <HomeHero featuredEvent={heroEvent} currentTask={currentTask} />
       <QuickActions actions={quickActions} />
       <ContinueSection items={continueItems} />

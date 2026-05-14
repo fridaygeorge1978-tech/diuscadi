@@ -23,9 +23,7 @@ import {
 } from "react-icons/lu";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
-import type {
-  PlatformConfigValue,
-} from "@/lib/models/platformConfig";
+import type { PlatformConfigValue } from "@/lib/models/platformConfig";
 
 type Config = Record<string, PlatformConfigValue>;
 
@@ -137,7 +135,7 @@ export default function AdminSettingsPage() {
 
   if (loading || !config) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] w-full md:mt-20 mt-10">
+      <div className="flex items-center justify-center min-h-[60vh] w-full mt-20">
         <LuLoader className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
@@ -150,7 +148,7 @@ export default function AdminSettingsPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.7 }}
-      className="max-w-[1600px] w-full md:mt-20 mt-10 p-5 mx-auto space-y-8"
+      className="max-w-[1600px] w-full mt-20 p-5 mx-auto space-y-8"
     >
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">

@@ -64,7 +64,7 @@ export const HomeHero = ({ featuredEvent, currentTask }: HomeHeroProps) => {
     : "Getting Started";
   const moduleAction = profileComplete
     ? () => router.push("/learn") // TODO: replace with real learning path
-    : () => router.push("/profile");
+    : () => router.push("/profile/edit");
 
   return (
     <section className={cn('w-full', 'max-w-7xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8', 'py-8')}>

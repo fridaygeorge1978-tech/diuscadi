@@ -657,7 +657,7 @@ export default function DepartmentsSettingsPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="max-w-[1600px] w-full md:mt-20 mt-10 p-5 mx-auto space-y-6"
+      className="max-w-[1600px] w-full mt-20 p-5 mx-auto space-y-6"
     >
       {/* Header */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">

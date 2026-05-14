@@ -94,7 +94,7 @@ function filterTickets(tickets: Ticket[], tab: FilterTab): Ticket[] {
 const TicketCard = ({ ticket }: { ticket: Ticket }) => {
   const router = useRouter();
   const { download, addToCalendar, downloading } = useShare();
-  
+
   const displayStatus = getDisplayStatus(ticket);
   const location = getLocationString(ticket);
   const eventDate = fmtDate(ticket.event.eventDate);
@@ -303,7 +303,7 @@ export default function TicketsPage() {
   }
 
   return (
-    <div className="w-full h-full md:mt-20 mt-10">
+    <div className="w-full h-full mt-20">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
         {/* Filter tabs */}
         <div className="flex items-center gap-2 bg-muted p-1.5 rounded-2xl border border-border w-fit mb-8">

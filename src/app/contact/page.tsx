@@ -96,6 +96,8 @@ const officeHours = [
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,9 +111,32 @@ export default function ContactPage() {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data);
-    setSubmitted(true);
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    setSubmitting(true);
+    setServerError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setServerError(json.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setServerError(
+        "Network error. Please check your connection and try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -459,12 +484,28 @@ export default function ContactPage() {
                       )}
                     />
 
+                    {serverError && (
+                      <p className="text-sm text-destructive text-center bg-destructive/10 rounded-xl px-4 py-3">
+                        {serverError}
+                      </p>
+                    )}
+
                     <Button
                       type="submit"
+                      disabled={submitting}
                       className="w-full h-12 font-bold text-base gap-2 rounded-2xl"
                     >
-                      <Send size={16} />
-                      Send Message
+                      {submitting ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Sending…
+                        </>
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          Send Message
+                        </>
+                      )}
                     </Button>
 
                     <p className="text-[10px] text-center text-muted-foreground leading-relaxed">

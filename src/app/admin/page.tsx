@@ -34,7 +34,7 @@ export default function AdminDashboard() {
   return (
     <div
       className={cn(
-        "min-h-screen w-full md:mt-20 mt-10",
+        "min-h-screen w-full mt-20",
         "bg-background",
         "flex",
         "overflow-hidden",

@@ -669,3 +669,136 @@ export function newsletterWelcomeEmail({ email }: NewsletterWelcomeEmailOptions)
 
   return { subject, html, text };
 }
+
+// ─── 10. Contact Form — Internal notification (to DIUSCADI inbox) ─────────────
+
+export interface ContactEnquiryEmailOptions {
+  senderName: string;
+  senderEmail: string;
+  organisation?: string;
+  enquiryType: string;  // e.g. "General Enquiry", "Partnership"
+  subject: string;
+  message: string;
+}
+
+export function contactEnquiryEmail({
+  senderName,
+  senderEmail,
+  organisation,
+  enquiryType,
+  subject,
+  message,
+}: ContactEnquiryEmailOptions) {
+  const emailSubject = `[Contact] ${enquiryType} — ${subject}`;
+  const html = wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:900;color:${PRIMARY_COLOR};text-transform:uppercase;letter-spacing:-0.02em;">
+      New Contact Enquiry
+    </h1>
+    <p style="margin:0 0 4px;font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.2em;">
+      Received via the DIUSCADI contact form
+    </p>
+
+    ${accentBanner("📩", enquiryType, subject, PRIMARY_COLOR, "#fefce8")}
+
+    <!-- Sender details -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      ${detailRow("From", senderName)}
+      ${detailRow("Email", senderEmail)}
+      ${organisation ? detailRow("Organisation", organisation) : ""}
+      ${detailRow("Enquiry Type", enquiryType)}
+      ${detailRow("Subject", subject)}
+    </table>
+
+    <!-- Message body -->
+    <div style="margin:20px 0;background:#f8fafc;border-left:3px solid ${ACCENT_COLOR};border-radius:8px;padding:16px 20px;">
+      <div style="font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:10px;">
+        Message
+      </div>
+      <div style="font-size:13px;color:#475569;line-height:1.8;white-space:pre-wrap;">
+        ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+      </div>
+    </div>
+
+    <!-- Quick reply button -->
+    <div style="text-align:center;margin:28px 0;">
+      <a href="mailto:${senderEmail}?subject=Re: ${encodeURIComponent(subject)}"
+         style="display:inline-block;background:${PRIMARY_COLOR};color:#ffffff;text-decoration:none;
+                font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;
+                padding:14px 32px;border-radius:12px;">
+        Reply to ${senderName}
+      </a>
+    </div>
+
+    <p style="margin:24px 0 0;font-size:11px;color:#94a3b8;text-align:center;line-height:1.6;">
+      This message was submitted through the DIUSCADI website contact form.
+    </p>
+  `);
+
+  const text = `New contact enquiry from ${senderName} (${senderEmail})\n\nType: ${enquiryType}\nSubject: ${subject}${organisation ? `\nOrganisation: ${organisation}` : ""}\n\nMessage:\n${message}`;
+
+  return { subject: emailSubject, html, text };
+}
+
+// ─── 11. Contact Form — Auto-reply (to the sender) ────────────────────────────
+
+export interface ContactAutoReplyEmailOptions {
+  senderName: string;
+  enquiryType: string;
+  subject: string;
+  message: string;
+}
+
+export function contactAutoReplyEmail({
+  senderName,
+  enquiryType,
+  subject,
+  message,
+}: ContactAutoReplyEmailOptions) {
+  const emailSubject = `${APP_NAME} — We've received your message`;
+  const html = wrapper(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:900;color:${PRIMARY_COLOR};text-transform:uppercase;letter-spacing:-0.02em;">
+      Message Received
+    </h1>
+    <p style="margin:0 0 4px;font-size:10px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.2em;">
+      Thank you, ${senderName}
+    </p>
+
+    <p style="margin:20px 0;font-size:13px;color:#475569;line-height:1.7;">
+      We've received your <strong>${enquiryType}</strong> enquiry and a member of
+      our team will review it shortly. We typically respond within
+      <strong>2 business days</strong>.
+    </p>
+
+    <!-- Echo of what they sent -->
+    <div style="margin:20px 0;background:#f8fafc;border-left:3px solid ${ACCENT_COLOR};border-radius:8px;padding:16px 20px;">
+      <div style="font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:6px;">
+        Your Message
+      </div>
+      <div style="font-size:11px;font-weight:700;color:${PRIMARY_COLOR};margin-bottom:8px;">
+        ${subject}
+      </div>
+      <div style="font-size:12px;color:#64748b;line-height:1.7;white-space:pre-wrap;">
+        ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+      </div>
+    </div>
+
+    <p style="margin:20px 0;font-size:12px;color:#94a3b8;line-height:1.7;">
+      In the meantime, you can reach us directly at
+      <a href="mailto:info@diuscadi.org.ng" style="color:${PRIMARY_COLOR};font-weight:700;">
+        info@diuscadi.org.ng
+      </a>
+      or connect with us on our social channels.
+    </p>
+
+    ${ctaButton("Visit Our Website", `${process.env.NEXT_PUBLIC_APP_URL ?? "https://diuscadi.org.ng"}`)}
+
+    <p style="margin:24px 0 0;font-size:11px;color:#94a3b8;text-align:center;line-height:1.6;">
+      Please do not reply to this email — it is sent automatically.
+      Use <a href="mailto:info@diuscadi.org.ng" style="color:#94a3b8;">info@diuscadi.org.ng</a> for direct correspondence.
+    </p>
+  `);
+
+  const text = `Hi ${senderName},\n\nThank you for reaching out to DIUSCADI. We've received your ${enquiryType} enquiry and will respond within 2 business days.\n\nYour message:\n"${subject}"\n\n${message}\n\nFor urgent matters contact us at info@diuscadi.org.ng`;
+
+  return { subject: emailSubject, html, text };
+}
