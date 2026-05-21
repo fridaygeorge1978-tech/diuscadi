@@ -97,7 +97,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({
             onPaste={handlePaste}
             onFocus={(e) => e.target.select()}
             className={`
-              w-11 h-14 text-center text-lg font-black text-foreground rounded-2xl border
+              md:w-11 md:h-14 w-8 h-10 text-center text-[14px] md:text-lg font-black text-foreground rounded-xl md:rounded-2xl border
               bg-muted focus:bg-background focus:ring-0 outline-none transition-all
               ${error ? "border-rose-400" : value[i] ? "border-foreground" : "border-border"}
               focus:border-foreground disabled:opacity-40 disabled:cursor-not-allowed

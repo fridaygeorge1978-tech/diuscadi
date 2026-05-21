@@ -519,7 +519,7 @@ function BannerTab({
     if (!event) return;
     updateSlide(slideId, {
       linkedEventId: event.id,
-      ctaHref: `/events/${event.id}`,
+      ctaHref: `/events/${event.slug}`,
       imageUrl: event.image || "",
       // Title and subtitle stay editable for marketing customisation
     });
