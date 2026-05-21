@@ -75,6 +75,8 @@ const DEFAULT_ALT: Record<string, string> = {
   "landing-initiative": "Initiative photo",
   "landing-logo": "Organisation logo",
   "landing-person": "Person photo",
+  "speaker-photo": "Speaker photo",
+  "sponsor-logo": "Sponsor logo",
 };
 
 export const POST = withAuth(async (req: AuthenticatedRequest) => {
@@ -489,6 +491,14 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
       };
 
       await Collections.gallery(db).insertOne(doc);
+      return NextResponse.json({ image: cloudinaryImage });
+    }
+
+    // ── speaker-photo + sponsor-logo ──────────────────────────────────────────
+    // These are NOT persisted to any document here — the admin modal holds them
+    // in local state and PATCHes the full speakers/sponsors array on save.
+    // confirm just assembles and returns the CloudinaryImage.
+    if (uploadType === "speaker-photo" || uploadType === "sponsor-logo") {
       return NextResponse.json({ image: cloudinaryImage });
     }
 

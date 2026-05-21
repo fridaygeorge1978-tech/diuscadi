@@ -25,7 +25,9 @@ export type ImageTag =
   | "gallery-outing"
   | "gallery-conference"
   | "gallery-workshop"
-  | "gallery-celebration";
+  | "gallery-celebration"
+   | "speaker-photo"   // Speaker headshot — 400×400, face-aware crop
+  | "sponsor-logo";   // Sponsor logo — 400×400, padded, white bg
 
 /**
  * Subset of Cloudinary's signed upload response that we persist.

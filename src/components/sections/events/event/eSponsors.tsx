@@ -5,11 +5,14 @@ import { LuBuilding2 } from "react-icons/lu";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { EventDetail } from "@/app/events/[slug]/page";
+import { EventSponsor } from "@/lib/models/Events";
 
 const TIER_ORDER = ["gold", "silver", "bronze", "partner"];
 
 export const SponsorsSection = ({ event }: { event: EventDetail }) => {
   const hasSponsors = event.sponsors.length > 0;
+
+  // const resolvedLogoUrl = sponsor.logo?.imageUrl ?? sponsor.logoUrl ?? null;
 
   if (!hasSponsors) {
     return (
@@ -205,7 +208,7 @@ function SponsorLogo({
   sponsor,
   tier,
 }: {
-  sponsor: { name: string; logoUrl?: string };
+  sponsor: EventSponsor;
   tier: string;
 }) {
   const sizes: Record<string, { w: number; h: number; cls: string }> = {
@@ -215,12 +218,13 @@ function SponsorLogo({
     partner: { w: 96, h: 32, cls: "h-8  w-24" },
   };
   const { w, h, cls } = sizes[tier] ?? sizes.partner;
+  const resolvedLogoUrl = sponsor.logo?.imageUrl ?? sponsor.logoUrl ?? null;
 
-  if (sponsor.logoUrl) {
+  if (resolvedLogoUrl) {
     return (
       <div className={cn("relative", cls)}>
         <Image
-          src={sponsor.logoUrl}
+          src={resolvedLogoUrl}
           alt={sponsor.name}
           width={w}
           height={h}

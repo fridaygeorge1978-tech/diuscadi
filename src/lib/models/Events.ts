@@ -12,12 +12,17 @@ export type TargetEduStatus = "STUDENT" | "GRADUATE" | "ALL";
 // ─── Sub-document types ───────────────────────────────────────────────────────
  
 export interface EventSpeaker {
-  name:        string;
-  title?:      string;        // e.g. "Senior Engineer at Google"
+  name: string;
+  title?: string; // e.g. "Senior Engineer at Google"
   organisation?: string;
-  bio?:        string;
-  avatarUrl?:  string;        // plain URL — speakers use external images for now
-  socialUrl?:  string;        // LinkedIn or personal site
+  bio?: string;
+  // Upgraded from plain string — stores publicId for Cloudinary cleanup
+  avatar?: CloudinaryImage;
+  // Legacy field kept for backwards compat with any existing DB documents
+  avatarUrl?: string;
+  socialUrl?: string;
+  // Set when populated from a platform member — enables profile link
+  userId?: string; // LinkedIn or personal site
 }
  
 export interface EventScheduleItem {
@@ -29,10 +34,13 @@ export interface EventScheduleItem {
 }
  
 export interface EventSponsor {
-  name:        string;
-  logoUrl?:    string;        // plain URL — sponsor logos are external
-  tier?:       "gold" | "silver" | "bronze" | "partner";
-  website?:    string;
+  name: string;
+  // Upgraded from plain string — stores publicId for Cloudinary cleanup
+  logo?: CloudinaryImage;
+  // Legacy field kept for backwards compat
+  logoUrl?: string;
+  tier?: "gold" | "silver" | "bronze" | "partner";
+  website?: string;
 }
  
 export interface EventFAQ {

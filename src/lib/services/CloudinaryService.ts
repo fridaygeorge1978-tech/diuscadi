@@ -149,6 +149,16 @@ const TRANSFORM_PRESETS: Record<UploadType, UploadPreset> = {
     folder: "diuscadi/gallery/celebration",
     maxFileSize: 15 * 1024 * 1024,
   },
+  "speaker-photo": {
+    eager: "c_fill,g_face,w_400,h_400,f_webp,q_auto:good",
+    folder: "diuscadi/events/speakers",
+    maxFileSize: 5 * 1024 * 1024,
+  },
+  "sponsor-logo": {
+    eager: "c_pad,w_400,h_400,b_white,f_webp,q_auto:good",
+    folder: "diuscadi/events/sponsors",
+    maxFileSize: 3 * 1024 * 1024,
+  },
 };
 
 // ─── Public ID generator ──────────────────────────────────────────────────────
@@ -289,6 +299,8 @@ export function allowedRolesForType(type: UploadType): string[] {
     case "gallery-conference":
     case "gallery-workshop":
     case "gallery-celebration":
+    case "speaker-photo":
+    case "sponsor-logo":
       return ["admin", "webmaster"];
   }
 }

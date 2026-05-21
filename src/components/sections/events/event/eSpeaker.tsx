@@ -172,27 +172,17 @@ export const SpeakersSection = ({ event }: { event: EventDetail }) => {
                   "shrink-0",
                 )}
               >
-                {speaker.avatarUrl ? (
+                {(speaker.avatar?.imageUrl ?? speaker.avatarUrl) ? (
                   <Image
-                    src={speaker.avatarUrl}
+                    src={speaker.avatar?.imageUrl ?? speaker.avatarUrl!}
                     alt={speaker.name}
                     width={80}
                     height={80}
-                    className={cn("w-full", "h-full", "object-cover")}
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div
-                    className={cn(
-                      "w-full",
-                      "h-full",
-                      "flex",
-                      "items-center",
-                      "justify-center",
-                    )}
-                  >
-                    <LuMic
-                      className={cn("w-8", "h-8", "text-muted-foreground")}
-                    />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <LuMic className="w-8 h-8 text-muted-foreground" />
                   </div>
                 )}
               </div>
