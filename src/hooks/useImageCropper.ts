@@ -91,6 +91,8 @@ const DEFAULT_CROPS: Record<UploadType, PercentCrop> = {
   "landing-banner": { unit: "%", x: 0, y: 0, width: 100, height: 100 },
   "landing-initiative": { unit: "%", x: 0, y: 12.5, width: 100, height: 75 },
   "landing-logo": { unit: "%", x: 12.5, y: 12.5, width: 75, height: 75 },
+  "sponsor-logo": { unit: "%", x: 12.5, y: 12.5, width: 75, height: 75 },
+  "speaker-photo": { unit: "%", x: 12.5, y: 12.5, width: 75, height: 75 },
   "landing-person": { unit: "%", x: 12.5, y: 12.5, width: 75, height: 75 },
   "gallery-event": { unit: "%", x: 0, y: 12.5, width: 100, height: 75 },
   "gallery-meeting": { unit: "%", x: 0, y: 12.5, width: 100, height: 75 },
@@ -113,6 +115,8 @@ export const CROP_ASPECT: Record<UploadType, number> = {
   "landing-banner": 1920 / 1080, // 16/9
   "landing-initiative": 4 / 3,
   "landing-logo": 1,
+  "speaker-photo": 1,
+  "sponsor-logo": 1,
   "landing-person": 1,
   "gallery-event": 1200 / 900, // 4:3
   "gallery-meeting": 1200 / 900,
@@ -137,6 +141,8 @@ const OUTPUT_DIMS: Record<UploadType, { width: number; height: number }> = {
   "landing-banner": { width: 1920, height: 1080 },
   "landing-initiative": { width: 1200, height: 900 },
   "landing-logo": { width: 400, height: 400 },
+  "sponsor-logo": { width: 400, height: 400 },
+  "speaker-photo": { width: 400, height: 400 },
   "landing-person": { width: 400, height: 400 },
   "gallery-event": { width: 1200, height: 900 },
   "gallery-meeting": { width: 1200, height: 900 },
