@@ -35,6 +35,7 @@ import {
   AnnouncementReadDocument,
 } from "@/lib/models/Announcement";
 import { GalleryDocument } from "../models/Gallery";
+import { SkillSuggestionDocument } from "../models/SkillSuggestion";
 
 export const Collections = {
   vault: (db: Db) => db.collection<VaultDocument>("vault"),
@@ -84,4 +85,6 @@ export const Collections = {
   announcementReads: (db: Db) =>
     db.collection<AnnouncementReadDocument>("announcementReads"),
   gallery: (db: Db) => db.collection<GalleryDocument>("gallery"),
+  skillSuggestions: (db: Db) =>
+    db.collection<SkillSuggestionDocument>("skillSuggestions"),
 };

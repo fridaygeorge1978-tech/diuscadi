@@ -47,19 +47,24 @@ export const PATCH = withAuth(
         "category",
         "format",
         "location",
+        "locationScope", // ← add
         "image",
         "eventDate",
         "endDate",
         "registrationDeadline",
+        "duration", // ← add
         "capacity",
         "targetEduStatus",
         "requiredSkills",
         "learningOutcomes",
         "tags",
+        "level", // ← add
+        "instructor", // ← add
         "status",
-        "speakers", // ← new
-        "sponsors", // ← new
-        "schedule", // ← new
+        "speakers",
+        "sponsors",
+        "schedule",
+        "faqs", // ← add
       ];
       const DATE_FIELDS = ["eventDate", "endDate", "registrationDeadline"];
 
