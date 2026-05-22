@@ -1,0 +1,1249 @@
+================================================================================
+            DIUSCADI EVENT ADMIN MODAL REBUILD SPECIFICATION
+              Complete Code Extraction & Analytical Summary
+================================================================================
+
+Generated: May 22, 2026
+Repository: emmzyrayz/diuscadi
+Extracted: 6 files totaling 2,000+ lines of code
+
+PURPOSE:
+  This document contains the COMPLETE code for 6 critical files used to rebuild
+  the /components/sections/admin/events/modals/AEEditModal.tsx with a fully
+  reorganized 5-step wizard that covers all event data including speakers,
+  sponsors, schedules, and FAQs.
+
+  Also includes comprehensive analysis answering:
+    A. What fields PATCH /api/admin/events/[id] accepts
+    B. Response shape of GET /api/platform/skills
+    C. Whether a pending skill system exists
+    D. Current ApplicationDocument shape for type "skills"
+
+================================================================================
+FILE 1: src/components/sections/admin/events/modals/AEEditModal.tsx
+================================================================================
+
+FILE TRUNCATED IN PREVIOUS EXTRACTION — SHOWING WHAT TOOL PROVIDED:
+
+The file was extracted but appears to show only line snippets (263-2562).
+Below is the known structure based on the page.tsx integration:
+
+CURRENT MODAL STRUCTURE (inferred from page.tsx usage):
+  - 5-step wizard with currentStep state management
+  - Form state stored in EventFormData
+  - Helper functions for timezone conversion (localDatetimeToIso, isoToLocalDatetime)
+  - Steps 1-5 with navigation controls
+
+KEY FORM STATE FIELDS (from AEEditModal usage in page.tsx):
+  - title: string
+  - category: string
+  - description: string (overview)
+  - date: string (YYYY-MM-DD format)
+  - startTime: string (HH:MM format)
+  - duration: number (hours)
+  - type: "Physical" | "Virtual" | "Hybrid"
+  - venueName: string
+  - coordinates: { lat: string; lng: string }
+  - maxCapacity: number
+  - ticketPrice: number
+  - enableWaitlist: boolean
+  - registrationDeadline: string (datetime-local format)
+  - visibility: "Public" | "Invite-Only"
+  - bannerBlob: Blob | null
+  - bannerPreviewUrl: string | null
+  - _originalStatus?: string (for republish detection)
+
+KNOWN STEPS (from STEPS constant):
+  1. "Basic Info" (LuInfo icon)
+  2. "Schedule" (LuMapPin icon)
+  3. "Capacity" (LuUsers icon)
+  4. "Partners" (LuMic icon) — Currently stubbed as "coming soon"
+  5. "Review" (LuShield icon)
+
+CURRENT STEP 4 LIMITATION (from code at line 853-866):
+  ```
+  const PartnersStep: React.FC<StepProps> = () => (
+    <div className={cn("space-y-8")}>
+      <div className={cn("flex", "items-center", "justify-between")}>
+        <h4 className={cn("text-[10px]", ...)}>Featured Speakers</h4>
+        <button className={cn(...)}>+ Add Speaker</button>
+      </div>
+      <p className={cn("text-xs", "font-bold", "text-muted-foreground")}>
+        Speaker management coming soon — add via event edit after creation.
+      </p>
+    </div>
+  );
+  ```
+
+CURRENT BANNER UPLOAD HELPER (from line 508-556):
+  - uploadBanner(blob: Blob, slug: string, token: string)
+  - Signs upload via POST /api/media/sign
+  - POSTs directly to Cloudinary
+  - Confirms upload via POST /api/media/confirm
+  - Fire-and-forget; errors logged but don't fail registration
+
+
+================================================================================
+FILE 2: src/app/api/admin/events/route.ts (COMPLETE)
+================================================================================
+
+// GET  /api/admin/events — admin + webmaster, list all events regardless of status
+// POST /api/admin/events — admin + webmaster, create a new event
+
+import { NextResponse } from "next/server";
+import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
+import { getDb } from "@/lib/mongodb";
+import { Collections } from "@/lib/db/collections";
+import { ObjectId } from "mongodb";
+
+const ALLOWED_ROLES = ["admin", "webmaster"];
+
+// ── GET ────────────────────────────────────────────────────────────
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
+  try {
+    if (!ALLOWED_ROLES.includes(req.auth.role)) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+    const category = searchParams.get("category");
+    const search = searchParams.get("search");
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
+    const limit = Math.min(50, parseInt(searchParams.get("limit") ?? "20"));
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, unknown> = {};
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (search) filter.title = { $regex: search, $options: "i" };
+
+    const db = await getDb();
+    const col = Collections.events(db);
+
+    const total = await col.countDocuments(filter);
+    const events = await col
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    // Attach registration counts via aggregation — avoids N+1 queries
+    const eventIds = events.map((e) => e._id!);
+    const regCounts = await Collections.eventRegistrations(db)
+      .aggregate([
+        { $match: { eventId: { $in: eventIds }, status: "registered" } },
+        { $group: { _id: "$eventId", count: { $sum: 1 } } },
+      ])
+      .toArray();
+    const countMap = new Map(
+      regCounts.map((r) => [r._id.toString(), r.count as number]),
+    );
+
+    return NextResponse.json({
+      events: events.map((e) => ({
+        id: e._id!.toString(),
+        title: e.title,
+        slug: e.slug,
+        status: e.status,
+        category: e.category,
+        format: e.format,
+        eventDate: e.eventDate.toISOString(),
+        endDate: e.endDate?.toISOString() ?? null,
+        registrationDeadline: e.registrationDeadline.toISOString(),
+        capacity: e.capacity,
+        registered: countMap.get(e._id!.toString()) ?? 0,
+        targetEduStatus: e.targetEduStatus,
+        requiredSkills: e.requiredSkills ?? [],
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+
+        // ── Media flags + URLs for admin list view ──────────────────────────
+        // Flags let the UI show "no logo" / "no banner" badges without having
+        // to inspect the full CloudinaryImage object.
+        // imageUrl fields are included for quick thumbnail previews in the list.
+        hasEventLogo: e.hasEventLogo,
+        eventLogoUrl: e.eventLogo?.imageUrl ?? null,
+        hasEventBanner: e.hasEventBanner,
+        eventBannerUrl: e.eventBanner?.imageUrl ?? null,
+        hasEventGallery: e.hasEventGallery,
+        galleryCount: e.eventGallery?.length ?? 0,
+        speakers: e.speakers ?? [],
+        sponsors: e.sponsors ?? [],
+        schedule: e.schedule ?? [],
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error("[GET /api/admin/events]", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+});
+
+// ── POST ────────────────────────────────────────────────────────────
+export const POST = withAuth(async (req: AuthenticatedRequest) => {
+  try {
+    if (!ALLOWED_ROLES.includes(req.auth.role)) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    const body = await req.json();
+    const {
+      title,
+      slug,
+      overview,
+      description,
+      shortDescription,
+      category,
+      format,
+      location,
+      locationScope,
+      eventDate,
+      endDate,
+      registrationDeadline,
+      capacity,
+      ticketPrice,
+      targetEduStatus,
+      requiredSkills,
+      learningOutcomes,
+      tags,
+      level,
+      instructor,
+      duration,
+      status,
+    } = body;
+
+    // Note: `image` is intentionally NOT accepted here.
+    // Event media (logo, banner, gallery) is uploaded separately via the
+    // media upload pipeline after the event document is created.
+    // Accepting a raw image string at creation time would bypass Cloudinary.
+
+    if (
+      !title ||
+      !slug ||
+      !eventDate ||
+      !registrationDeadline ||
+      !format ||
+      !category
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "title, slug, eventDate, registrationDeadline, format, and category are required",
+        },
+        { status: 400 },
+      );
+    }
+
+    const db = await getDb();
+    const now = new Date();
+
+    const slugExists = await Collections.events(db).findOne({ slug });
+    if (slugExists) {
+      return NextResponse.json(
+        { error: "An event with this slug already exists" },
+        { status: 409 },
+      );
+    }
+
+    const normalizedCapacity =
+      typeof capacity === "number" && Number.isFinite(capacity)
+        ? Math.max(0, capacity)
+        : 0;
+    const normalizedTicketPrice =
+      typeof ticketPrice === "number" && Number.isFinite(ticketPrice)
+        ? Math.max(0, ticketPrice)
+        : 0;
+
+    const { insertedId } = await Collections.events(db).insertOne({
+      title: title.trim(),
+      slug: slug.trim(),
+      overview: overview ?? "",
+      description: description ?? "",
+      shortDescription: shortDescription ?? "",
+      category,
+      format,
+      location: location ?? {},
+      locationScope: locationScope ?? "local",
+      eventDate: new Date(eventDate),
+      registrationDeadline: new Date(registrationDeadline),
+      capacity: normalizedCapacity,
+      targetEduStatus: targetEduStatus ?? "ALL",
+      requiredSkills: requiredSkills ?? [],
+      learningOutcomes: learningOutcomes ?? [],
+      tags: tags ?? [],
+      status: status ?? "draft",
+      createdBy: new ObjectId(req.auth.vaultId),
+
+      // ── Media — initialised as empty at creation time ─────────────────────
+      // Images are attached after creation via PATCH /api/admin/events/[id]/media.
+      // Flags default to false; image fields are omitted until an upload succeeds.
+      hasEventLogo: false,
+      hasEventBanner: false,
+      hasEventGallery: false,
+
+      createdAt: now,
+      updatedAt: now,
+
+      // Optional fields — only spread when provided
+      ...(endDate ? { endDate: new Date(endDate) } : {}),
+      ...(level ? { level } : {}),
+      ...(instructor ? { instructor } : {}),
+      ...(duration ? { duration } : {}),
+    });
+
+    // Create default ticket tier so registration can always resolve ticketTypeId.
+    await Collections.ticketTypes(db).insertOne({
+      eventId: insertedId,
+      name: normalizedTicketPrice > 0 ? "General Admission" : "Free Pass",
+      price: normalizedTicketPrice,
+      currency: "NGN",
+      maxQuantity: normalizedCapacity,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return NextResponse.json(
+      {
+        message: "Event created successfully",
+        eventId: insertedId.toString(),
+        slug: slug.trim(),
+        status: status ?? "draft",
+      },
+      { status: 201 },
+    );
+  } catch (err) {
+    console.error("[POST /api/admin/events]", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+});
+
+
+================================================================================
+FILE 3: src/app/api/admin/events/[id]/route.ts (COMPLETE)
+================================================================================
+
+// PATCH  /api/admin/events/[id] — admin + webmaster, update any event field
+// DELETE /api/admin/events/[id] — admin + webmaster, cancel or hard-delete event
+//   Body for DELETE: { action: "cancel" | "delete" }
+//   "cancel" sets status to "cancelled" (safe, preserves registrations)
+//   "delete" hard-deletes event + all ticketTypes + all registrations
+
+import { NextResponse } from "next/server";
+import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
+import { getDb } from "@/lib/mongodb";
+import { Collections } from "@/lib/db/collections";
+import { ObjectId } from "mongodb";
+
+const ALLOWED_ROLES = ["admin", "webmaster"];
+type Context = {
+  params?: Promise<Record<string, string>> | Record<string, string>;
+};
+
+// ── PATCH ────────────────────────────────────────────────────────────
+export const PATCH = withAuth(
+  async (req: AuthenticatedRequest, context?: Context) => {
+    try {
+      if (!ALLOWED_ROLES.includes(req.auth.role)) {
+        return NextResponse.json(
+          { error: "Admin access required" },
+          { status: 403 },
+        );
+      }
+
+      const params = context?.params
+        ? await Promise.resolve(context.params)
+        : {};
+      const id = params.id as string;
+      if (!id || !ObjectId.isValid(id)) {
+        return NextResponse.json(
+          { error: "Invalid event ID" },
+          { status: 400 },
+        );
+      }
+
+      const body = await req.json();
+      const ALLOWED_FIELDS = [
+        "title",
+        "slug",
+        "description",
+        "overview",
+        "shortDescription",
+        "category",
+        "format",
+        "location",
+        "image",
+        "eventDate",
+        "endDate",
+        "registrationDeadline",
+        "capacity",
+        "targetEduStatus",
+        "requiredSkills",
+        "learningOutcomes",
+        "tags",
+        "status",
+        "speakers", // ← new
+        "sponsors", // ← new
+        "schedule", // ← new
+      ];
+      const DATE_FIELDS = ["eventDate", "endDate", "registrationDeadline"];
+
+      const updates: Record<string, unknown> = {};
+      for (const field of ALLOWED_FIELDS) {
+        if (body[field] !== undefined) {
+          updates[field] = DATE_FIELDS.includes(field)
+            ? new Date(body[field])
+            : body[field];
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json(
+          { error: "No valid fields to update" },
+          { status: 400 },
+        );
+      }
+
+      // Slug uniqueness check if slug is being updated
+      if (updates.slug) {
+        const slugExists = await (await getDb()).collection("events").findOne({
+          slug: updates.slug,
+          _id: { $ne: new ObjectId(id) },
+        });
+        if (slugExists) {
+          return NextResponse.json(
+            { error: "Slug already taken by another event" },
+            { status: 409 },
+          );
+        }
+      }
+
+      updates.updatedAt = new Date();
+      const db = await getDb();
+
+      const result = await Collections.events(db).findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updates },
+        { returnDocument: "after" },
+      );
+
+      if (!result)
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+      return NextResponse.json({
+        message: "Event updated successfully",
+        eventId: id,
+        slug: result.slug,
+        status: result.status,
+        updatedAt: result.updatedAt.toISOString(),
+      });
+    } catch (err) {
+      console.error("[PATCH /api/admin/events/[id]]", err);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      );
+    }
+  },
+);
+
+// ── DELETE ───────────────────────────────────────────────────────────
+export const DELETE = withAuth(
+  async (req: AuthenticatedRequest, context?: Context) => {
+    try {
+      if (!ALLOWED_ROLES.includes(req.auth.role)) {
+        return NextResponse.json(
+          { error: "Admin access required" },
+          { status: 403 },
+        );
+      }
+
+      const params = context?.params
+        ? await Promise.resolve(context.params)
+        : {};
+      const id = params.id as string;
+      if (!id || !ObjectId.isValid(id)) {
+        return NextResponse.json(
+          { error: "Invalid event ID" },
+          { status: 400 },
+        );
+      }
+
+      const { action } = await req.json().catch(() => ({ action: "cancel" }));
+      if (!["cancel", "delete"].includes(action)) {
+        return NextResponse.json(
+          { error: "action must be 'cancel' or 'delete'" },
+          { status: 400 },
+        );
+      }
+
+      const db = await getDb();
+      const oid = new ObjectId(id);
+
+      const event = await Collections.events(db).findOne({ _id: oid });
+      if (!event)
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+      if (action === "cancel") {
+        await Collections.events(db).updateOne(
+          { _id: oid },
+          { $set: { status: "cancelled", updatedAt: new Date() } },
+        );
+        return NextResponse.json({
+          message: "Event cancelled successfully",
+          eventId: id,
+        });
+      }
+
+      // Hard delete — remove event + ticketTypes + registrations
+      await Promise.all([
+        Collections.events(db).deleteOne({ _id: oid }),
+        Collections.ticketTypes(db).deleteMany({ eventId: oid }),
+        Collections.eventRegistrations(db).deleteMany({ eventId: oid }),
+      ]);
+
+      return NextResponse.json({
+        message: "Event and all associated data deleted permanently",
+        eventId: id,
+      });
+    } catch (err) {
+      console.error("[DELETE /api/admin/events/[id]]", err);
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      );
+    }
+  },
+);
+
+
+================================================================================
+FILE 4: src/lib/models/Events.ts (COMPLETE)
+================================================================================
+
+// lib/models/Event.ts
+import { ObjectId } from "mongodb";
+import { CloudinaryImage } from "@/types/cloudinary";
+
+export type EventFormat = "physical" | "virtual" | "hybrid";
+export type EventStatus = "draft" | "published" | "cancelled";
+export type EventLevel = "Beginner" | "Intermediate" | "Advanced";
+export type LocationScope = "local" | "state" | "national";
+export type TargetEduStatus = "STUDENT" | "GRADUATE" | "ALL";
+
+  
+// ─── Sub-document types ──────────────────────────────────────────────────────
+  
+export interface EventSpeaker {
+  name: string;
+  title?: string; // e.g. "Senior Engineer at Google"
+  organisation?: string;
+  bio?: string;
+  // Upgraded from plain string — stores publicId for Cloudinary cleanup
+  avatar?: CloudinaryImage;
+  // Legacy field kept for backwards compat with any existing DB documents
+  avatarUrl?: string;
+  socialUrl?: string;
+  // Set when populated from a platform member — enables profile link
+  userId?: string; // LinkedIn or personal site
+}
+  
+export interface EventScheduleItem {
+  time:        string;        // e.g. "09:00 AM"
+  title:       string;        // e.g. "Opening Ceremony"
+  description?: string;
+  speaker?:    string;        // speaker name only — denormalised for display
+  type:        "session" | "break" | "workshop" | "keynote" | "networking";
+}
+  
+export interface EventSponsor {
+  name: string;
+  // Upgraded from plain string — stores publicId for Cloudinary cleanup
+  logo?: CloudinaryImage;
+  // Legacy field kept for backwards compat
+  logoUrl?: string;
+  tier?: "gold" | "silver" | "bronze" | "partner";
+  website?: string;
+}
+  
+export interface EventFAQ {
+  question:    string;
+  answer:      string;
+}
+
+// ─── Main document ────────────────────────────────────────────────────────
+
+export interface EventDocument {
+  _id?: ObjectId;
+
+  // ── Identity ──────────────────────────────────────────────────────────
+  slug: string; // e.g. "summit-2026" — unique, URL-safe
+  title: string;
+  overview: string;
+  learningOutcomes: string[];
+
+  // ── Classification ────────────────────────────────────────────────────
+  category: string;
+  tags: string[];
+  level?: EventLevel;
+  description: string;
+  shortDescription: string;
+
+  // ── Targeting (personalized feed filtering) ───────────────────────────
+  requiredSkills: string[]; // matched against user.skills
+  targetEduStatus: TargetEduStatus; // "student" | "graduate" | "all"
+  locationScope: LocationScope; // "local" | "state" | "national"
+
+  // ── Speaker / instructor ──────────────────────────────────────────────
+  instructor?: string;
+
+  // ── Format + location ─────────────────────────────────────────────────
+  format: EventFormat;
+  location?: {
+    venue?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+  };
+
+  // ── Scheduling ─────────────────────────────────────────────────────
+  eventDate: Date;
+  endDate?: Date;
+  registrationDeadline: Date;
+  duration?: string; // e.g. "2 hours", "3 days"
+
+  // ── Capacity ──────────────────────────────────────────────────────
+  // slotsRemaining is NOT stored — calculated dynamically via aggregation.
+  capacity: number;
+
+  // ── Media ─────────────────────────────────────────────────────────
+  /**
+   * Primary event identity image (square / round logo).
+   * Optional — some events may be created before assets are ready.
+   */
+  hasEventLogo: boolean;
+  eventLogo?: CloudinaryImage; // tag: "event-logo"
+
+  /**
+   * Wide hero / cover image shown at the top of the event page.
+   * Optional — limited or low-budget events may skip this.
+   */
+  hasEventBanner: boolean;
+  eventBanner?: CloudinaryImage; // tag: "event-banner"
+
+  /**
+   * Photo gallery for the event (before, during, or after shots).
+   * Optional array — may be empty or absent for future/draft events.
+   */
+  hasEventGallery: boolean;
+  eventGallery?: CloudinaryImage[]; // tag: "event-gallery" on each item
+
+  // ── Rich content (managed by admin after event creation) ──────────────
+
+  /**
+   * Speakers and facilitators.
+   * Empty array = not yet announced. Shown as placeholder UI until populated.
+   */
+  speakers?: EventSpeaker[];
+
+  /**
+   * Agenda / schedule items ordered chronologically.
+   * Empty array = not yet published. Shown as placeholder UI until populated.
+   */
+  schedule?: EventScheduleItem[];
+
+  /**
+   * Sponsors for this specific event.
+   * Empty array = none yet confirmed.
+   */
+  sponsors?: EventSponsor[];
+
+  /**
+   * Per-event FAQs. When empty, the component falls back to
+   * platform-level default FAQs so the section is never blank.
+   */
+  faqs?: EventFAQ[];
+
+  // ── Status ──────────────────────────────────────────────────────────
+  status: EventStatus;
+
+  // ── Ownership ─────────────────────────────────────────────────────────
+  createdBy: ObjectId; // → Vault._id of admin who created it
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
+================================================================================
+FILE 5: src/lib/models/platformConfig.ts (COMPLETE)
+================================================================================
+
+// lib/models/PlatformConfig.ts
+// ────────────────────────────────────────────────────────────────
+// Documents for platform-managed lists: committees, skills, committeeRoles.
+// All three collections are webmaster-managed and publicly readable.
+// ────────────────────────────────────────────────────────────────
+
+// Key-value store for all platform-wide feature flags and config values.
+// One document per key. Read by GET /api/platform/config (public).
+// Written by PATCH /api/admin/settings (admin/webmaster only).
+
+import { ObjectId } from "mongodb";
+
+// ─── Committee ─────────────────────────────────────────────────────────
+
+export interface CommitteeDocument {
+  _id?: ObjectId;
+
+  /** Unique machine-readable key — used in CommitteeMembership.committee */
+  slug: string; // e.g. "socials", "media"
+
+  /** Display name shown in UI */
+  name: string; // e.g. "Socials", "Media & Content"
+
+  description: string; // shown on committee page + application form
+
+  /**
+   * Tailwind color token or hex — used to tint committee badges + cards.
+   * e.g. "emerald", "violet", "#f59e0b"
+   */
+  color: string;
+
+  /**
+   * Icon identifier — matches whatever icon library you're using.
+   * e.g. "megaphone", "camera", "truck"
+   */
+  icon: string;
+
+  /**
+   * Display name of the current committee head.
+   * Denormalised string — updated manually by webmaster when head changes.
+   * Keeping it as a string (not ObjectId) avoids a join on every public read.
+   */
+  headName?: string;
+
+  /**
+   * Live member count — maintained via $inc on membership assignment/removal.
+   * Stored for fast display without aggregation.
+   */
+  memberCount: number;
+
+  isActive: boolean;
+
+  /** Sort order for display — lower = shown first */
+  displayOrder: number;
+
+  createdBy: ObjectId; // → Vault._id of webmaster who created it
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Skill ───────────────────────────────────────────────────────────
+
+export type SkillCategory =
+  | "Creative"
+  | "Technical"
+  | "Business"
+  | "Communication"
+  | "Other";
+
+export interface SkillDocument {
+  _id?: ObjectId;
+
+  /** Unique machine-readable key — stored in UserData.skills[] */
+  slug: string; // e.g. "photography", "programming"
+
+  /** Display name */
+  name: string; // e.g. "Photography", "Programming"
+
+  category: SkillCategory;
+
+  isActive: boolean;
+
+  /** Sort order within category — lower = shown first */
+  displayOrder: number;
+
+  createdBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── CommitteeRole ────────────────────────────────────────────────────────
+
+export interface CommitteeRoleDocument {
+  _id?: ObjectId;
+
+  /** Unique machine-readable key — stored in CommitteeMembership.role */
+  slug: string; // e.g. "MEMBER", "COORDINATOR", "HEAD", "ADMIN"
+
+  /** Display name */
+  name: string; // e.g. "Member", "Coordinator"
+
+  /**
+   * Numeric rank — used for sorting and permission comparisons.
+   * Higher = more authority. e.g. MEMBER=1, COORDINATOR=2, HEAD=3, ADMIN=4
+   */
+  rank: number;
+
+  /** Human-readable summary of what this role can do — shown in admin UI */
+  description: string;
+
+  isActive: boolean;
+
+  createdBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type PlatformConfigKey =
+  // ── Access control ─────────────────────────────────────────────────────
+  | "inviteMode" // "open" | "lockdown" | "referral"
+  | "registrationOpen" // boolean
+  | "eventsOpen" // boolean
+  | "applicationsOpen" // boolean
+  | "maintenanceMode" // boolean
+
+  // ── Registration fees + referral ───────────────────────────────────────
+  | "registrationFee" // number (NGN)
+  | "referralDiscountPercent" // number (0–100)
+  | "referralBonusPoints" // number
+
+  // ── UI toggles ─────────────────────────────────────────────────────────
+  | "showBanners" // boolean
+  | "showGallery" // boolean
+
+  // ── Debug mode ─────────────────────────────────────────────────────────
+  | "debugMode" // boolean
+  | "debugTargets"; // string[] — userIds or ["all"]
+
+export type PlatformConfigValue = string | number | boolean | string[] | null;
+
+export interface PlatformConfigDocument {
+  _id?: ObjectId;
+  key: PlatformConfigKey;
+  value: PlatformConfigValue;
+  updatedAt: Date;
+  updatedBy: ObjectId; // → Vault._id
+}
+
+// Default values — used when seeding or when a key is missing
+export const PLATFORM_CONFIG_DEFAULTS: Record<
+  PlatformConfigKey,
+  PlatformConfigValue
+> = {
+  inviteMode: "open",
+  registrationOpen: true,
+  eventsOpen: true,
+  applicationsOpen: true,
+  maintenanceMode: false,
+  registrationFee: 0,
+  referralDiscountPercent: 10,
+  referralBonusPoints: 50,
+  showBanners: true,
+  showGallery: true,
+  debugMode: false,
+  debugTargets: [],
+};
+
+
+================================================================================
+FILE 6: src/app/api/platform/skills/route.ts (COMPLETE)
+================================================================================
+
+// app/api/platform/skills/route.ts
+// GET /api/platform/skills — public
+// Returns all active skills grouped by category, ordered by displayOrder.
+
+import { NextResponse } from "next/server";
+import { getDb } from "@/lib/mongodb";
+import { Collections } from "@/lib/db/collections";
+import { seedIfEmpty } from "@/lib/db/seed";
+import type { SkillCategory } from "@/lib/models/platformConfig";
+
+export async function GET() {
+  try {
+    const db = await getDb();
+    await seedIfEmpty();
+
+    const skills = await Collections.skills(db)
+      .find({ isActive: true })
+      .sort({ category: 1, displayOrder: 1 })
+      .project({
+        _id: 0,
+        slug: 1,
+        name: 1,
+        category: 1,
+        displayOrder: 1,
+      })
+      .toArray();
+
+    // Group by category for the frontend — avoids client-side grouping logic
+    const grouped = skills.reduce<
+      Record<
+        SkillCategory,
+        { slug: string; name: string; displayOrder: number }[]
+      >
+    >(
+      (acc, skill) => {
+        const cat = skill.category as SkillCategory;
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push({
+          slug: skill.slug as string,
+          name: skill.name as string,
+          displayOrder: skill.displayOrder as number,
+        });
+        return acc;
+      },
+      {} as Record<
+        SkillCategory,
+        { slug: string; name: string; displayOrder: number }[]
+      >,
+    );
+
+    return NextResponse.json({
+      // Also expose flat list for validation and simple dropdowns
+      skills: skills.map((s) => ({
+        slug: s.slug,
+        name: s.name,
+        category: s.category,
+      })),
+      grouped,
+    });
+  } catch (err) {
+    console.error("[GET /api/platform/skills]", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+
+================================================================================
+FILE 7: src/lib/models/Application.ts (COMPLETE)
+================================================================================
+
+// lib/models/Application.ts
+
+import { ObjectId } from "mongodb";
+
+export type ApplicationType =
+  | "membership" // participant → approved member (sets membershipStatus)
+  | "committee" // join a committee
+  | "skills" // add skills + professional verification
+  | "sponsorship" // sponsor an event (stub — fulfilled when sponsorship system built)
+  | "program" // expert in a career path/program (stub)
+  | "writer"; // blog contributor (stub — fulfilled when blog system built)
+
+export type ApplicationStatus = "pending" | "approved" | "rejected";
+
+export interface ApplicationDocument {
+  _id?: ObjectId;
+  userId: ObjectId; // → UserData._id
+  vaultId: ObjectId; // → Vault._id
+
+  type: ApplicationType;
+  status: ApplicationStatus;
+
+  // ── Type-specific payloads ─────────────────────────────────────────────────
+
+  // committee
+  requestedCommittee?: string; // committee slug
+
+  // skills
+  requestedSkills?: string[]; // skill slugs
+
+  // membership — no extra payload needed, just reason
+
+  // sponsorship
+  sponsorshipDetails?: {
+    companyName?: string;
+    website?: string;
+    eventIds?: string[]; // specific events or open offer
+    tier?: string; // e.g. "gold", "silver", "bronze"
+  };
+
+  // program / career path
+  requestedProgram?: string; // program slug
+  expertiseProof?: string; // free-text or URL to evidence
+
+  // writer
+  writingSamples?: string[]; // URLs to writing samples
+  topics?: string[]; // topics they'd cover
+
+  // ── Shared ───────────────────────────────────────────────────────────
+  reason?: string;
+
+  // ── Review ───────────────────────────────────────────────────────────
+  reviewedBy?: ObjectId;
+  reviewNote?: string;
+  reviewedAt?: Date;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
+================================================================================
+ANALYTICAL ANSWERS
+================================================================================
+
+ANSWER A: What fields does PATCH /api/admin/events/[id] currently accept?
+────────────────────────────────────────────────────────────────────────────
+
+YES — The route HAS BEEN UPDATED to support speakers, sponsors, and schedule.
+
+ALLOWED_FIELDS array (from line 41-63 of [id]/route.ts):
+  ✅ "title"
+  ✅ "slug"
+  ✅ "description"
+  ✅ "overview"
+  ✅ "shortDescription"
+  ✅ "category"
+  ✅ "format"
+  ✅ "location"
+  ✅ "image"
+  ✅ "eventDate"
+  ✅ "endDate"
+  ✅ "registrationDeadline"
+  ✅ "capacity"
+  ✅ "targetEduStatus"
+  ✅ "requiredSkills"
+  ✅ "learningOutcomes"
+  ✅ "tags"
+  ✅ "status"
+  ✅ "speakers" ← NEW (line 60)
+  ✅ "sponsors" ← NEW (line 61)
+  ✅ "schedule" ← NEW (line 62)
+
+NOTE: "faqs" field is NOT in ALLOWED_FIELDS — needs to be added if you want
+      to support FAQ updates.
+
+HOW IT WORKS:
+  - Client sends PATCH body with any of these fields
+  - Route iterates through ALLOWED_FIELDS
+  - For each field in body, if defined:
+    * If field is in DATE_FIELDS: convert to Date
+    * Otherwise: pass through as-is
+  - Update applied via MongoDB $set operator
+
+VALIDATION:
+  - No validation on speakers[], sponsors[], schedule[] arrays
+  - They are passed through as-is from request body
+  - Client is responsible for sending correct data structure
+
+
+ANSWER B: What is the exact response shape from GET /api/platform/skills?
+────────────────────────────────────────────────────────────────────────────
+
+Response structure (from GET /api/platform/skills):
+
+{
+  "skills": [
+    {
+      "slug": "photography",
+      "name": "Photography",
+      "category": "Creative"
+    },
+    {
+      "slug": "programming",
+      "name": "Programming",
+      "category": "Technical"
+    },
+    // ... more items
+  ],
+  "grouped": {
+    "Creative": [
+      {
+        "slug": "photography",
+        "name": "Photography",
+        "displayOrder": 1
+      }
+      // ... more Creative skills
+    ],
+    "Technical": [
+      {
+        "slug": "programming",
+        "name": "Programming",
+        "displayOrder": 1
+      }
+      // ... more Technical skills
+    ],
+    "Business": [ /* ... */ ],
+    "Communication": [ /* ... */ ],
+    "Other": [ /* ... */ ]
+  }
+}
+
+KEY POINTS:
+  - "skills" array: flat list of all active skills
+  - "grouped" object: same skills organized by SkillCategory
+  - Both use skill "slug" not "_id"
+  - displayOrder is ONLY in grouped object, not in flat list
+  - No _id fields returned (projection excludes them)
+  - Only isActive: true skills are returned
+
+
+ANSWER C: Does a "pending skill" or "skill suggestion" system exist?
+────────────────────────────────────────────────────────────────────────────
+
+NO — There is NO "pending skill" or "skill suggestion" system.
+
+WHAT EXISTS INSTEAD:
+  The ApplicationDocument has type: "skills" which allows users to:
+    1. Submit an application requesting specific skills
+    2. Store requestedSkills: string[] (array of skill slugs)
+    3. Get approved/rejected by admin
+
+HOWEVER:
+  - The skill application does NOT propose NEW skills
+  - It only allows users to claim ownership of EXISTING skills from the
+    skills collection
+  - There is NO mechanism in the codebase for:
+    * pendingSkills collection
+    * skillSuggestions collection
+    * skill-requests collection
+    * User-submitted new skills awaiting admin approval
+
+CURRENT WORKFLOW:
+  1. Admin/webmaster manually creates SkillDocument entries
+  2. Users apply via Application (type: "skills") for existing skills
+  3. Admin approves/rejects application
+  4. If approved, skills are added to UserData.skills[]
+
+TO IMPLEMENT USER-PROPOSED SKILLS:
+  You would need to:
+    a) Add pendingSkills collection with SkillDocument + proposedBy field
+    b) Add route PATCH /api/admin/platform/skills to approve pending skills
+    c) Add UI form in admin modal to manage pending skill proposals
+
+
+ANSWER D: What is current ApplicationDocument shape for type "skills"?
+────────────────────────────────────────────────────────────────────────────
+
+ApplicationDocument with type: "skills" structure:
+
+{
+  "_id": ObjectId,
+  "userId": ObjectId,           // → UserData._id
+  "vaultId": ObjectId,          // → Vault._id
+
+  "type": "skills",             // literal string
+  "status": "pending" | "approved" | "rejected",
+
+  // Skills-specific payload:
+  "requestedSkills": string[],  // array of skill SLUGS (not IDs)
+                                // e.g. ["photography", "programming"]
+
+  // Shared fields:
+  "reason": string,             // optional — why they want these skills
+
+  // Review fields:
+  "reviewedBy": ObjectId,       // optional — admin who reviewed
+  "reviewNote": string,         // optional — admin notes
+  "reviewedAt": Date,           // optional — when reviewed
+
+  // Metadata:
+  "createdAt": Date,
+  "updatedAt": Date
+}
+
+KEY POINTS:
+  ✅ requestedSkills stores SLUGS (strings), not skill IDs
+  ✅ Allows admin to review and approve/reject
+  ✅ No attachment to specific event — platform-wide skills
+  ✅ "reason" field is optional but can explain why member wants skills
+  ✅ No automatic skill assignment — admin manually approves or rejects
+
+DATA FLOW:
+  1. User submits Application { type: "skills", requestedSkills: [...] }
+  2. Admin reviews application
+  3. If approved:
+     - Application.status = "approved"
+     - Admin (or automation) adds skills to UserData.skills[]
+  4. User profile shows approved skills
+
+
+NOTES FOR REBUILD:
+  - requestedSkills are SLUGS, not full SkillDocument objects
+  - When displaying in admin UI, look up slug in skills collection to get name
+  - ValidationError if skill slug doesn't exist
+  - No "suggested skills" feature — users can only claim existing skills
+
+
+================================================================================
+SUMMARY: ACTIONABLE NEXT STEPS FOR EXTERNAL ASSISTANT
+================================================================================
+
+WHAT NEEDS TO BE BUILT:
+  1. AEEditModal.tsx Step 4 ("Partners") needs 3 sub-tabs:
+     a) Speakers (add/edit/delete EventSpeaker objects)
+     b) Sponsors (add/edit/delete EventSponsor objects by tier)
+     c) Schedule (add/edit/delete/reorder EventScheduleItem objects)
+
+  2. Extend form state to include:
+     - speakers: EventSpeaker[]
+     - sponsors: EventSponsor[]
+     - schedule: EventScheduleItem[]
+     - faqs: EventFAQ[] (optional — currently missing)
+
+  3. Extend PATCH route to accept:
+     - speakers
+     - sponsors
+     - schedule
+     - faqs (NOT currently in ALLOWED_FIELDS)
+
+  4. Upload support for speaker avatars and sponsor logos:
+     - Use existing Cloudinary pipeline
+     - Store avatar?: CloudinaryImage in EventSpeaker
+     - Store logo?: CloudinaryImage in EventSponsor
+
+CURRENT STATE:
+  ✅ PATCH route accepts speakers, sponsors, schedule
+  ❌ AEEditModal doesn't have UI for Step 4 content
+  ❌ EventSpeaker and EventSponsor need CloudinaryImage upgrade
+  ❌ PATCH route doesn't accept faqs
+  ❌ AEEditModal form state doesn't include these arrays
+
+DATA MODELS READY:
+  ✅ EventDocument fully typed with speakers[], sponsors[], schedule[], faqs[]
+  ✅ EventSpeaker, EventSponsor, EventScheduleItem, EventFAQ all defined
+  ✅ Skills system ready (GET /api/platform/skills returns { skills, grouped })
+
+SKILLS INTEGRATION:
+  - NO pending skills system exists (would need to be built)
+  - Skills in events are just string[] (requiredSkills field)
+  - If building speaker/sponsor skill integration, they must use existing skills
+  - Can validate against GET /api/platform/skills response
+
+
+================================================================================
+END OF SPECIFICATION DOCUMENT
+================================================================================
+
+Document version: 1.0
+Generated: May 22, 2026
+Last commit: 34e4e1a3973a8a78a271929b3c8847597488343c
