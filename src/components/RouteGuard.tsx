@@ -17,7 +17,7 @@ const ROLE_HOME: Record<AccountRole, string> = {
 };
 
 // Routes the guard itself redirects to — never block these or you get a loop
-const GUARD_SYSTEM_ROUTES = ["/auth", "/unauthorized"];
+const GUARD_SYSTEM_ROUTES = ["/", "/auth", "/unauthorized"];
 
 // Fully public pages — no redirect even when unauthenticated
 const OPEN_ROUTES = ["/about", "/contact", "/gallery"];
@@ -51,7 +51,7 @@ export const RouteGuard = ({ children }: { children: React.ReactNode }) => {
     );
 
     // 1. Authenticated user on "/" or any "/auth/*" → send to their role home
-    if (isAuthenticated && (pathname === "/" || pathname.startsWith("/auth"))) {
+    if (isAuthenticated && pathname.startsWith("/auth")) {
       router.replace(user ? ROLE_HOME[user.role] : "/home");
       return;
     }
