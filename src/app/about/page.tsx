@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import mentor from "@/assets/img/downloads/Dr-Ikechukwu-Umeh-1440x1920.webp";
+import mentor from "@/assets/img/downloads/Dr-Ikechukwu-Umeh-1440x1920.jpg";
 import { AboutTeamMember, TeamTier } from "@/lib/models/aboutPageConfig";
 import { usePathname } from "next/navigation";
 
@@ -276,7 +276,7 @@ function TeamCard({ member }: { member: AboutTeamMember }) {
       )}
 
       {/* Gradient Overlay for better text legibility */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+      <div className={cn('absolute', 'inset-0', 'bg-gradient-to-t', 'from-black/60', 'via-transparent', 'to-transparent', 'opacity-60')} />
 
       {/* Floating Glass Info Card */}
       <motion.div
@@ -346,7 +346,7 @@ function TeamCard({ member }: { member: AboutTeamMember }) {
       </a>
     );
   }
-  return <div className="h-full w-full">{inner}</div>;
+  return <div className={cn('h-full', 'w-full')}>{inner}</div>;
 }
 
 

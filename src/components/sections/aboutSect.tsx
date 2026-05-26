@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Target, Lightbulb, Users2, Rocket, BookOpen, Globe } from "lucide-react";
-import mentor from "@/assets/img/downloads/Dr-Ikechukwu-Umeh-1440x1920.webp";
+import mentor from "@/assets/img/downloads/Dr-Ikechukwu-Umeh-1440x1920.jpg";
 
 const PROGRAMMES = [
   "DIUSCADI Women in Tech & Enterprise",
