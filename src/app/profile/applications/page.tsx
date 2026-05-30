@@ -36,6 +36,11 @@ import type {
   Application,
   ApplicationType,
 } from "@/context/ApplicationContext";
+import type { ApplicationStatus, AvailabilityCategory } from "@/lib/models/Application";
+import {
+  AVAILABILITY_CATEGORIES,
+  AVAILABILITY_LABELS,
+} from "@/lib/models/Application";
 
 // ── Status styles ─────────────────────────────────────────────────────────────
 
@@ -56,12 +61,18 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> =
       text: "text-rose-700",
       dot: "bg-rose-500",
     },
+    withdrawn: {
+      bg: "bg-slate-50 border-slate-100",
+      text: "text-slate-500",
+      dot: "bg-slate-400",
+    },
   };
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<ApplicationStatus, React.ElementType> = {
   pending: LuClock,
   approved: LuCircleCheck,
   rejected: LuCircleX,
+  withdrawn: LuX,
 };
 
 // ── Application type config ───────────────────────────────────────────────────
@@ -176,6 +187,13 @@ export default function ProfileApplicationsPage() {
   const [topicInput, setTopicInput] = useState("");
   const [reason, setReason] = useState("");
 
+  const [committeeSkills, setCommitteeSkills] = useState<string[]>([]);
+  const [availabilityCategory, setAvailabilityCategory] = useState<
+    AvailabilityCategory | ""
+  >("");
+  const [availabilityNote, setAvailabilityNote] = useState("");
+  const [references, setReferences] = useState("");
+
   useEffect(() => {
     if (token) loadMyApplications();
     loadCommittees();
@@ -186,6 +204,10 @@ export default function ProfileApplicationsPage() {
     setActiveForm(null);
     setSelectedComm("");
     setSelectedSkills([]);
+    setCommitteeSkills([]);
+    setAvailabilityCategory("");
+    setAvailabilityNote("");
+    setReferences("");
     setRequestedProgram("");
     setTopics([]);
     setTopicInput("");
@@ -206,11 +228,28 @@ export default function ProfileApplicationsPage() {
           toast.error("Select a committee");
           return;
         }
+        if (!availabilityCategory) {
+          toast.error("Select your availability");
+          return;
+        }
+        if (!reason.trim()) {
+          toast.error("Tell us why you want to join this committee");
+          return;
+        }
         await submitApplication(
           {
             type: "committee",
             requestedCommittee: selectedComm,
-            reason: reason || undefined,
+            reason: reason.trim(),
+            committeeSkills:
+              committeeSkills.length > 0 ? committeeSkills : undefined,
+            availability: {
+              category: availabilityCategory as AvailabilityCategory,
+              ...(availabilityNote.trim()
+                ? { note: availabilityNote.trim() }
+                : {}),
+            },
+            ...(references.trim() ? { references: references.trim() } : {}),
           },
           token,
         );
@@ -362,9 +401,9 @@ export default function ProfileApplicationsPage() {
                     "text-[10px] font-bold text-muted-foreground mt-1 leading-relaxed",
                   )}
                 >
-                  Apply for DIUSCADI membership below. Once approved, you&apos;ll
-                  unlock committee applications, skills verification, writer
-                  applications, and more.
+                  Apply for DIUSCADI membership below. Once approved,
+                  you&apos;ll unlock committee applications, skills
+                  verification, writer applications, and more.
                 </p>
               </div>
             </motion.div>
@@ -581,63 +620,218 @@ export default function ProfileApplicationsPage() {
 
                             {/* ── COMMITTEE form ─────────────────────────── */}
                             {activeForm === "committee" && (
-                              <div className="space-y-2">
-                                <label
-                                  className={cn(
-                                    "text-[10px] font-black text-muted-foreground uppercase tracking-widest",
-                                  )}
-                                >
-                                  Select Committee{" "}
-                                  <span className="text-rose-500">*</span>
-                                </label>
-                                <div
-                                  className={cn(
-                                    "grid grid-cols-1 sm:grid-cols-2 gap-2",
-                                  )}
-                                >
-                                  {(committees ?? []).map((c) => (
-                                    <button
-                                      key={c.slug}
-                                      onClick={() => setSelectedComm(c.slug)}
-                                      className={cn(
-                                        "flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all cursor-pointer",
-                                        selectedComm === c.slug
-                                          ? "border-primary bg-primary/5"
-                                          : "border-border hover:border-slate-300",
-                                      )}
-                                    >
-                                      <div
+                              <div className="space-y-5">
+                                {/* Committee selector — unchanged */}
+                                <div className="space-y-2">
+                                  <label
+                                    className={cn(
+                                      "text-[10px] font-black text-muted-foreground uppercase tracking-widest",
+                                    )}
+                                  >
+                                    Select Committee{" "}
+                                    {activeForm === "committee" ||
+                                    activeForm === "sponsorship" ? (
+                                      <span className="text-rose-500 ml-1">
+                                        *
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground ml-1">
+                                        (optional)
+                                      </span>
+                                    )}
+                                  </label>
+                                  <div
+                                    className={cn(
+                                      "grid grid-cols-1 sm:grid-cols-2 gap-2",
+                                    )}
+                                  >
+                                    {(committees ?? []).map((c) => (
+                                      <button
+                                        key={c.slug}
+                                        onClick={() => setSelectedComm(c.slug)}
                                         className={cn(
-                                          "w-8 h-8 rounded-xl flex items-center justify-center text-background text-[11px] font-black shrink-0",
+                                          "flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all cursor-pointer",
+                                          selectedComm === c.slug
+                                            ? "border-primary bg-primary/5"
+                                            : "border-border hover:border-slate-300",
                                         )}
-                                        style={{ backgroundColor: c.color }}
                                       >
-                                        {c.name.charAt(0)}
+                                        <div
+                                          className={cn(
+                                            "w-8 h-8 rounded-xl flex items-center justify-center text-background text-[11px] font-black shrink-0",
+                                          )}
+                                          style={{ backgroundColor: c.color }}
+                                        >
+                                          {c.name.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p
+                                            className={cn(
+                                              "text-[11px] font-black uppercase tracking-wide truncate",
+                                              selectedComm === c.slug
+                                                ? "text-primary"
+                                                : "text-foreground",
+                                            )}
+                                          >
+                                            {c.name}
+                                          </p>
+                                          <p
+                                            className={cn(
+                                              "text-[9px] font-bold text-muted-foreground mt-0.5",
+                                            )}
+                                          >
+                                            {c.memberCount} members
+                                          </p>
+                                        </div>
+                                        {selectedComm === c.slug && (
+                                          <LuCircleCheck className="w-4 h-4 text-primary ml-auto shrink-0" />
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Skills to highlight — pulled from user's own profile skills */}
+                                {profile?.skills &&
+                                  profile.skills.length > 0 && (
+                                    <div className="space-y-2">
+                                      <label
+                                        className={cn(
+                                          "text-[10px] font-black text-muted-foreground uppercase tracking-widest",
+                                        )}
+                                      >
+                                        Skills You&apos;re Bringing{" "}
+                                        <span className="text-muted-foreground">
+                                          (optional)
+                                        </span>
+                                      </label>
+                                      <p
+                                        className={cn(
+                                          "text-[9px] font-bold text-muted-foreground leading-relaxed",
+                                        )}
+                                      >
+                                        Select which of your profile skills are
+                                        most relevant to this committee.
+                                      </p>
+                                      <div
+                                        className={cn("flex flex-wrap gap-2")}
+                                      >
+                                        {profile.skills.map((slug) => {
+                                          const skillItem = (skills ?? []).find(
+                                            (s) => s.slug === slug,
+                                          );
+                                          const label = skillItem?.name ?? slug;
+                                          const selected =
+                                            committeeSkills.includes(slug);
+                                          return (
+                                            <button
+                                              key={slug}
+                                              onClick={() =>
+                                                setCommitteeSkills((prev) =>
+                                                  prev.includes(slug)
+                                                    ? prev.filter(
+                                                        (s) => s !== slug,
+                                                      )
+                                                    : [...prev, slug],
+                                                )
+                                              }
+                                              className={cn(
+                                                "px-3 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                                                selected
+                                                  ? "border-primary bg-primary/10 text-primary"
+                                                  : "border-border text-muted-foreground hover:border-slate-300 hover:text-foreground",
+                                              )}
+                                            >
+                                              {label}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
-                                      <div className="min-w-0">
+                                      {committeeSkills.length > 0 && (
                                         <p
                                           className={cn(
-                                            "text-[11px] font-black uppercase tracking-wide truncate",
-                                            selectedComm === c.slug
-                                              ? "text-primary"
-                                              : "text-foreground",
+                                            "text-[9px] font-bold text-primary uppercase tracking-widest",
                                           )}
                                         >
-                                          {c.name}
+                                          {committeeSkills.length} skill
+                                          {committeeSkills.length !== 1
+                                            ? "s"
+                                            : ""}{" "}
+                                          selected
                                         </p>
-                                        <p
-                                          className={cn(
-                                            "text-[9px] font-bold text-muted-foreground mt-0.5",
-                                          )}
-                                        >
-                                          {c.memberCount} members
-                                        </p>
-                                      </div>
-                                      {selectedComm === c.slug && (
-                                        <LuCircleCheck className="w-4 h-4 text-primary ml-auto shrink-0" />
                                       )}
-                                    </button>
-                                  ))}
+                                    </div>
+                                  )}
+
+                                {/* Availability */}
+                                <div className="space-y-2">
+                                  <label
+                                    className={cn(
+                                      "text-[10px] font-black text-muted-foreground uppercase tracking-widest",
+                                    )}
+                                  >
+                                    Availability{" "}
+                                    <span className="text-rose-500">*</span>
+                                  </label>
+                                  <div
+                                    className={cn(
+                                      "grid grid-cols-2 sm:grid-cols-3 gap-2",
+                                    )}
+                                  >
+                                    {AVAILABILITY_CATEGORIES.map((cat) => (
+                                      <button
+                                        key={cat}
+                                        onClick={() =>
+                                          setAvailabilityCategory(cat)
+                                        }
+                                        className={cn(
+                                          "p-3 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer",
+                                          availabilityCategory === cat
+                                            ? "border-primary bg-primary/5 text-primary"
+                                            : "border-border text-muted-foreground hover:border-slate-300",
+                                        )}
+                                      >
+                                        {AVAILABILITY_LABELS[cat]}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {/* Availability note */}
+                                  <input
+                                    type="text"
+                                    value={availabilityNote}
+                                    onChange={(e) =>
+                                      setAvailabilityNote(e.target.value)
+                                    }
+                                    placeholder="Any notes on your availability? e.g. not available during exams"
+                                    className={cn(
+                                      "w-full bg-muted border border-border rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:border-primary transition-all",
+                                    )}
+                                  />
+                                </div>
+
+                                {/* References / past experience */}
+                                <div className="space-y-2">
+                                  <label
+                                    className={cn(
+                                      "text-[10px] font-black text-muted-foreground uppercase tracking-widest",
+                                    )}
+                                  >
+                                    Past Experience & References{" "}
+                                    <span className="text-muted-foreground">
+                                      (optional)
+                                    </span>
+                                  </label>
+                                  <textarea
+                                    value={references}
+                                    onChange={(e) =>
+                                      setReferences(e.target.value)
+                                    }
+                                    placeholder="Any relevant past experience, links to work, or references you'd like to include…"
+                                    rows={3}
+                                    className={cn(
+                                      "w-full bg-muted border border-border rounded-2xl p-4 text-sm font-medium outline-none focus:border-primary transition-all resize-none",
+                                    )}
+                                  />
                                 </div>
                               </div>
                             )}
@@ -681,7 +875,9 @@ export default function ProfileApplicationsPage() {
                                     )}
                                   >
                                     {selectedSkills.length} skill
-                                    {selectedSkills.length !== 1 ? "s" : ""}{" "}
+                                    {selectedSkills.length !== 1
+                                      ? "s"
+                                      : ""}{" "}
                                     selected
                                   </p>
                                 )}
@@ -794,8 +990,8 @@ export default function ProfileApplicationsPage() {
                                 >
                                   Describe your sponsorship interest in the
                                   field below — include your organisation name,
-                                  the type of support you&apos;re offering, and any
-                                  events or programmes you&apos;d like to be
+                                  the type of support you&apos;re offering, and
+                                  any events or programmes you&apos;d like to be
                                   associated with.
                                 </p>
                               </div>

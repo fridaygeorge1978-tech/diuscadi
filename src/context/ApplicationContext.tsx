@@ -8,6 +8,7 @@ import {
   useCallback,
   ReactNode,
 } from "react";
+import type { AvailabilityCategory } from "@/lib/models/Application";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,14 +20,22 @@ export type ApplicationType =
   | "program"
   | "writer";
 
-export type ApplicationStatus = "pending" | "approved" | "rejected";
+export type ApplicationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "withdrawn";
 
 export interface Application {
   id: string;
   type: ApplicationType;
   status: ApplicationStatus;
-  // type-specific payloads
+  // committee-specific
   requestedCommittee?: string;
+  committeeSkills?: string[];
+  availability?: { category: AvailabilityCategory; note?: string };
+  references?: string | null;
+  // other type payloads
   requestedSkills?: string[];
   requestedProgram?: string;
   sponsorshipDetails?: Record<string, unknown> | null;
@@ -41,12 +50,18 @@ export interface Application {
 
 export interface SubmitApplicationPayload {
   type: ApplicationType;
+  // committee
   requestedCommittee?: string;
+  committeeSkills?: string[];
+  availability?: { category: AvailabilityCategory; note?: string };
+  references?: string;
+  // other types
   requestedSkills?: string[];
   requestedProgram?: string;
   sponsorshipDetails?: Record<string, unknown>;
   writingSamples?: string[];
   topics?: string[];
+  // shared
   reason?: string;
 }
 
@@ -68,6 +83,7 @@ interface ApplicationContextValue extends ApplicationState {
     payload: SubmitApplicationPayload,
     token: string,
   ) => Promise<Application>;
+  withdrawApplication: (id: string, token: string) => Promise<void>;
   hasPending: (type: ApplicationType) => boolean;
   hasApproved: (type: ApplicationType) => boolean;
   getLatest: (type: ApplicationType) => Application | undefined;
@@ -170,7 +186,14 @@ export function ApplicationProvider({
     ): Promise<Application> => {
       setState((s) => ({ ...s, submitting: true, error: null }));
       try {
-        const res = await fetch("/api/applications", {
+        // Committee applications go to the dedicated endpoint —
+        // all other types hit the general applications route.
+        const endpoint =
+          payload.type === "committee"
+            ? "/api/applications/committee"
+            : "/api/applications";
+
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: authHeaders(tkn),
           body: JSON.stringify(payload),
@@ -186,6 +209,9 @@ export function ApplicationProvider({
           type: data.type,
           status: data.status,
           requestedCommittee: payload.requestedCommittee,
+          committeeSkills: payload.committeeSkills,
+          availability: payload.availability,
+          references: payload.references ?? null,
           requestedSkills: payload.requestedSkills,
           requestedProgram: payload.requestedProgram,
           sponsorshipDetails: payload.sponsorshipDetails ?? null,
@@ -207,6 +233,37 @@ export function ApplicationProvider({
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to submit application";
+        setState((s) => ({ ...s, submitting: false, error: message }));
+        throw err;
+      }
+    },
+    [],
+  );
+
+  // Withdraw own pending application
+  const withdrawApplication = useCallback(
+    async (id: string, tkn: string): Promise<void> => {
+      setState((s) => ({ ...s, submitting: true, error: null }));
+      try {
+        const res = await fetch(`/api/applications/committee/${id}`, {
+          method: "PATCH",
+          headers: authHeaders(tkn),
+          body: JSON.stringify({ status: "withdrawn" }),
+        });
+        await handleResponse(res);
+        setState((s) => ({
+          ...s,
+          submitting: false,
+          applications: s.applications.map((a) =>
+            a.id === id
+              ? { ...a, status: "withdrawn" as ApplicationStatus }
+              : a,
+          ),
+          pendingCount: Math.max(0, s.pendingCount - 1),
+        }));
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to withdraw application";
         setState((s) => ({ ...s, submitting: false, error: message }));
         throw err;
       }
@@ -240,6 +297,7 @@ export function ApplicationProvider({
         ...state,
         loadMyApplications,
         submitApplication,
+        withdrawApplication,
         hasPending,
         hasApproved,
         getLatest,

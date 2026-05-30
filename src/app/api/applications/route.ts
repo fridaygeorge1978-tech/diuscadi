@@ -115,28 +115,40 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
     }
 
     // ── Committee: validate against live DB list ───────────────────────────
+    // if (type === "committee") {
+    //   if (!requestedCommittee || typeof requestedCommittee !== "string") {
+    //     return NextResponse.json(
+    //       { error: "requestedCommittee is required" },
+    //       { status: 400 },
+    //     );
+    //   }
+    //   const committeeDoc = await Collections.committees(db).findOne({
+    //     slug: requestedCommittee,
+    //     isActive: true,
+    //   });
+    //   if (!committeeDoc) {
+    //     const valid = await Collections.committees(db)
+    //       .find({ isActive: true }, { projection: { slug: 1, _id: 0 } })
+    //       .toArray();
+    //     return NextResponse.json(
+    //       {
+    //         error: `Invalid committee. Must be one of: ${valid.map((c) => c.slug).join(", ")}`,
+    //       },
+    //       { status: 400 },
+    //     );
+    //   }
+    // }
+
+    // ── Committee: redirect to dedicated endpoint ──────────────────────────
     if (type === "committee") {
-      if (!requestedCommittee || typeof requestedCommittee !== "string") {
-        return NextResponse.json(
-          { error: "requestedCommittee is required" },
-          { status: 400 },
-        );
-      }
-      const committeeDoc = await Collections.committees(db).findOne({
-        slug: requestedCommittee,
-        isActive: true,
-      });
-      if (!committeeDoc) {
-        const valid = await Collections.committees(db)
-          .find({ isActive: true }, { projection: { slug: 1, _id: 0 } })
-          .toArray();
-        return NextResponse.json(
-          {
-            error: `Invalid committee. Must be one of: ${valid.map((c) => c.slug).join(", ")}`,
-          },
-          { status: 400 },
-        );
-      }
+      return NextResponse.json(
+        {
+          error:
+            "Committee applications must be submitted via POST /api/applications/committee",
+          redirect: "/api/applications/committee",
+        },
+        { status: 308 }, // 308 Permanent Redirect — tells the client the method is preserved
+      );
     }
 
     // ── Skills: validate against live DB list ─────────────────────────────

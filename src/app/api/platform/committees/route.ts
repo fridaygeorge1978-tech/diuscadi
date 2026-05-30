@@ -19,6 +19,7 @@ export async function GET() {
         _id: 0,
         slug: 1,
         name: 1,
+        shortDesc: 1,
         description: 1,
         color: 1,
         icon: 1,

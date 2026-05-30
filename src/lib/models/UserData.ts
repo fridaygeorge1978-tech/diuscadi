@@ -39,6 +39,22 @@ export interface UserLocation {
   rawCity?: string;
 }
 
+// ── Temporary assignment ──────────────────────────────────────────────────────
+// Written by admin via POST /api/admin/users/[id]/temp-assign.
+// Read and auto-reverted by /api/auth/me when endsAt < now.
+// Never touches the permanent committeeMembership field directly —
+// the original membership is snapshotted here so revert is lossless.
+
+export interface TemporaryAssignment {
+  committee: string;              // slug of the temp committee
+  role: string;                   // role slug during the temp period
+  endsAt: Date;                   // auto-revert fires when now > endsAt
+  originalCommittee: string | null; // their committee before (null = had none)
+  originalRole: string | null;      // their role before (null = had none)
+  assignedBy: ObjectId;           // → Vault._id of admin who made the assignment
+  assignedAt: Date;
+}
+
 export interface UserDataDocument {
   _id?: ObjectId;
   vaultId: ObjectId;
@@ -112,6 +128,15 @@ export interface UserDataDocument {
   };
 
   committeeMembership: CommitteeMembership | null;
+
+  /**
+   * Set when admin temporarily assigns this member to another committee.
+   * While this field is present and endsAt > now, the effective committee
+   * for display purposes is temporaryAssignment.committee — NOT committeeMembership.
+   * /api/auth/me checks and clears this automatically on expiry.
+   */
+  temporaryAssignment?: TemporaryAssignment; // ← NEW
+
   skills: Skill[]; // skill slugs manually verified by admin
   verifiedSkills?: string[];
   profileCompleted: boolean;

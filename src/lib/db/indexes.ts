@@ -318,6 +318,11 @@ export async function createIndexes() {
     );
   console.log("✓ aboutPageConfig");
 
+  await db.collection("applications").createIndex({ vaultId: 1, status: 1 });
+  await db
+    .collection("applications")
+    .createIndex({ requestedCommittee: 1, status: 1 });
+
   console.log("\n✅ All indexes created.");
 }
 

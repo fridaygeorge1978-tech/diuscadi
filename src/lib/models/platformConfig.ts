@@ -21,6 +21,13 @@ export interface CommitteeDocument {
   /** Display name shown in UI */
   name: string; // e.g. "Socials", "Media & Content"
 
+  /**
+   * One-liner shown in the selector deck on the public showcase.
+   * Keep under ~80 chars. Full detail goes in `description`.
+   */
+  shortDesc?: string; // ← NEW
+
+  /** Full mandate — shown in the inspector panel on the public showcase */
   description: string; // shown on committee page + application form
 
   /**
@@ -34,6 +41,12 @@ export interface CommitteeDocument {
    * e.g. "megaphone", "camera", "truck"
    */
   icon: string;
+
+  /**
+   * WhatsApp group invite link for this committee.
+   * Shown only to approved members inside PrivateCommitteeDashboard.
+   */
+  whatsappLink?: string; // ← NEW
 
   /**
    * Display name of the current committee head.
@@ -106,9 +119,11 @@ export interface CommitteeRoleDocument {
   rank: number;
 
   /** Human-readable summary of what this role can do — shown in admin UI */
-  description: string;
+  description?: string;
 
   isActive: boolean;
+
+  displayOrder: number;
 
   createdBy: ObjectId;
   createdAt: Date;

@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb";
 
 export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const db = await getDb();
+  const vaultId = new ObjectId(req.auth.vaultId);
 
   const vault = await Collections.vault(db).findOne({
     _id: new ObjectId(req.auth.vaultId),
@@ -18,6 +19,25 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
   const userData = await Collections.userData(db).findOne({
     vaultId: new ObjectId(req.auth.vaultId),
   });
+
+  // ── Auto-revert expired temporary assignments ──────────────────────────────
+  // Fires on every session restore and every page load that calls /api/auth/me.
+  // No cron required — the DB is the source of truth, this just cleans it up.
+  if (userData?.temporaryAssignment) {
+    const now = new Date();
+    if (userData.temporaryAssignment.endsAt <= now) {
+      await Collections.committees(db).updateOne(
+        { slug: userData.temporaryAssignment.committee },
+        { $inc: { memberCount: -1 } },
+      );
+      await Collections.userData(db).updateOne(
+        { vaultId },
+        { $unset: { temporaryAssignment: "" }, $set: { updatedAt: now } },
+      );
+      // Clear it locally so the response reflects the reverted state immediately
+      delete userData.temporaryAssignment;
+    }
+  }
 
   // Strip sensitive fields before returning.
   // Prefixed with _ to suppress "assigned but never used" TS warnings —
