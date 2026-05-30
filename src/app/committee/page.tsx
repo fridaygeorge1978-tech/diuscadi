@@ -16,19 +16,24 @@ export default function CommitteePage() {
   const { profile, isLoading: profileLoading } = useUser();
 
   useEffect(() => {
-    // ── Never fire the gate while session is still being restored ────────────
-    // sessionStatus === "pending" means /api/auth/me hasn't resolved yet.
-    // profile is always null during this window even with a valid token —
-    // acting on it here would redirect authenticated users to /auth incorrectly.
+    // ── Wait for session to finish restoring ──────────────────────────────
     if (sessionStatus === "pending") return;
 
-    // Session resolved — if no token or no profile, they're genuinely not authed
+    // ── Wait for UserContext to finish fetching the full profile ──────────
+    // After sessionStatus becomes "restored", UserContext calls refreshProfile
+    // which is async. profile is null during this window even though the
+    // user is authenticated — acting here would redirect them to /auth.
+    if (profileLoading) return;
+
+    // ── Edge case: restored but profile seed hasn't run yet ───────────────
+    if (sessionStatus === "restored" && !profile) return;
+
+    // ── Now we can safely make an access decision ─────────────────────────
     if (!token || !profile) {
       router.push("/auth");
       return;
     }
 
-    // Participants with no membership approval stay in the application stack
     if (
       profile.role === "participant" &&
       profile.membershipStatus !== "approved"
