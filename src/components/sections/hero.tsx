@@ -7,11 +7,60 @@ import { GraduationCap, CalendarCheck } from "lucide-react";
 import student from "@/assets/img/downloads/Esther-Chiamaka.webp";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { useEvents } from "@/context/EventContext";
+import { useAuth } from "@/context/AuthContext";
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Returns true if the event date is still in the future. */
+function isUpcoming(eventDate: string) {
+  return new Date(eventDate) > new Date();
+}
 
 export const Hero = () => {
   const pathname = usePathname();
 
-  
+  // ── Event data ─────────────────────────────────────────────────────────────
+  const { publicEvents, loadPublicEvents, publicEventsLoading } = useEvents();
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    loadPublicEvents(1); // we only need the single latest/upcoming event
+  }, [loadPublicEvents]);
+
+  const event = publicEvents[0] ?? null;
+
+  // ── Derived display values ─────────────────────────────────────────────────
+  // Badge — e.g. "LASCADSS 7.0"
+  const badgeLabel = event?.title ?? "LASCADSS — Now in its 7th Edition";
+
+  // Primary CTA text
+  const ctaText = event
+    ? `Apply Free — ${event.title}`
+    : "Apply Free — LASCADSS 7.0";
+
+  // Floating card status chip
+  const floatingStatus =
+    event && isUpcoming(event.eventDate) ? "Coming Soon" : "Recently Held";
+
+  // Floating card label
+  const floatingLabel = event?.title ?? "LASCADSS 7.0";
+
+  // ── Auth-aware CTA href ────────────────────────────────────────────────────
+  // Authenticated  → send directly to the event registration page
+  // Guest          → auth page with a redirect back to event registration
+  const ctaHref = (() => {
+    if (!event) {
+      // No event yet — fall back to original behaviour (auth → home redirect)
+      return `/auth?redirect=${encodeURIComponent(pathname ?? "/")}`;
+    }
+    const registerPath = `/events/${event.slug}/register`;
+    return isAuthenticated
+      ? registerPath
+      : `/auth?redirect=${encodeURIComponent(registerPath)}`;
+  })();
+
   return (
     <section
       className={cn(
@@ -47,14 +96,14 @@ export const Hero = () => {
           "items-center",
         )}
       >
-        {/* LEFT CONTENT */}
+        {/* ── LEFT CONTENT ─────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
           className="text-left"
         >
-          {/* Trust badge */}
+          {/* Trust / edition badge */}
           <div
             className={cn(
               "inline-flex",
@@ -70,10 +119,12 @@ export const Hero = () => {
               "text-sm",
               "font-semibold",
               "mb-6",
+              // Pulse the badge while we're still fetching so it feels alive
+              publicEventsLoading && "animate-pulse",
             )}
           >
             <GraduationCap className={cn("w-4", "h-4")} />
-            <span>LASCADSS — Now in its 7th Edition</span>
+            <span>{badgeLabel}</span>
           </div>
 
           <h1
@@ -107,6 +158,7 @@ export const Hero = () => {
           </p>
 
           <div className={cn("mt-10", "flex", "flex-wrap", "gap-4")}>
+            {/* Primary CTA — auth-aware */}
             <Button
               size="lg"
               className={cn(
@@ -115,15 +167,14 @@ export const Hero = () => {
                 "text-base",
                 "shadow-lg",
                 "shadow-primary/20",
+                // Dim slightly while event data is still loading
+                publicEventsLoading && "opacity-70 pointer-events-none",
               )}
               asChild
             >
-              <Link
-                href={`/auth?redirect=${encodeURIComponent(pathname ?? "/")}`}
-              >
-                Apply Free — LASCADSS 7.0
-              </Link>
+              <Link href={ctaHref}>{ctaText}</Link>
             </Button>
+
             <Button
               variant="outline"
               size="lg"
@@ -134,7 +185,7 @@ export const Hero = () => {
             </Button>
           </div>
 
-          {/* Impact numbers */}
+          {/* Impact numbers — static org-level stats, not event-specific */}
           <div
             className={cn(
               "mt-12",
@@ -174,7 +225,7 @@ export const Hero = () => {
           </div>
         </motion.div>
 
-        {/* RIGHT IMAGE */}
+        {/* ── RIGHT IMAGE ──────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -210,7 +261,7 @@ export const Hero = () => {
             />
           </div>
 
-          {/* Floating card */}
+          {/* Floating event card */}
           <div
             className={cn(
               "absolute",
@@ -253,10 +304,11 @@ export const Hero = () => {
                     "tracking-wider",
                   )}
                 >
-                  Coming Soon
+                  {/* Shows "Coming Soon" or "Recently Held" based on event date */}
+                  {floatingStatus}
                 </p>
                 <p className={cn("text-background", "font-bold")}>
-                  LASCADSS 7.0
+                  {floatingLabel}
                 </p>
               </div>
             </div>

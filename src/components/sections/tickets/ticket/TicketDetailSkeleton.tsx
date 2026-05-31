@@ -9,9 +9,7 @@ const Shimmer = ({ className }: { className?: string }) => (
 );
 
 export const TicketDetailSkeleton = () => (
-  <main
-    className={cn("min-h-screen min-w-full", "bg-muted/50", "pt-[72px]")}
-  >
+  <main className={cn("min-h-screen min-w-full", "bg-muted/50", "pt-[72px]")}>
     {/* Header */}
     <div
       className={cn(
@@ -31,7 +29,12 @@ export const TicketDetailSkeleton = () => (
     <div className={cn("max-w-4xl", "mx-auto", "px-4", "py-10", "space-y-8")}>
       {/* Visual card skeleton */}
       <Shimmer
-        className={cn("h-[460px]", "w-72", "mx-auto", "rounded-[2.5rem]")}
+        className={cn(
+          "min-h-[460px] h-auto",
+          "w-72",
+          "mx-auto",
+          "rounded-[2.5rem]",
+        )}
       />
       {/* Meta info skeleton */}
       <Shimmer className={cn("h-72", "rounded-[2.5rem]")} />

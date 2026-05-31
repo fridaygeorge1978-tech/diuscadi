@@ -135,7 +135,7 @@ export const ImpactSection = () => {
           >
             Numbers That Tell the Story
           </h2>
-          <p className={cn("text-muted-foreground", "max-w-xl", "mx-auto")}>
+          <p className={cn("text-slate-100", "max-w-xl", "mx-auto")}>
             Every figure represents a life touched, a career launched, and a
             future changed by DIUSCADI&apos;s programmes.
           </p>
@@ -199,7 +199,7 @@ export const ImpactSection = () => {
                   <p className={cn("text-lg", "font-bold", "text-slate-200")}>
                     {stat.label}
                   </p>
-                  <p className={cn("text-sm", "text-muted-foreground", "mt-1")}>
+                  <p className={cn("text-sm", "text-slate-100", "mt-1")}>
                     {stat.subtext}
                   </p>
                 </div>
@@ -230,7 +230,7 @@ export const ImpactSection = () => {
           className={cn(
             "text-center",
             "mt-16",
-            "text-muted-foreground",
+            "text-slate-100",
             "text-sm",
             "font-medium",
             "tracking-widest",
