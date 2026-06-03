@@ -36,6 +36,8 @@ import {
 } from "@/lib/models/Announcement";
 import { GalleryDocument } from "../models/Gallery";
 import { SkillSuggestionDocument } from "../models/SkillSuggestion";
+import type { DbTask, DbAssignment, DbBotActionLog } from "@/lib/db/dbTypes";
+
 
 export const Collections = {
   vault: (db: Db) => db.collection<VaultDocument>("vault"),
@@ -87,4 +89,7 @@ export const Collections = {
   gallery: (db: Db) => db.collection<GalleryDocument>("gallery"),
   skillSuggestions: (db: Db) =>
     db.collection<SkillSuggestionDocument>("skillSuggestions"),
+  tasks: (db: Db) => db.collection<DbTask>("tasks"),
+  assignments: (db: Db) => db.collection<DbAssignment>("assignments"),
+  botActionLogs: (db: Db) => db.collection<DbBotActionLog>("bot_action_logs"),
 };
