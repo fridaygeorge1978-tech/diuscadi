@@ -33,6 +33,11 @@ const PARTNERS: Partner[] = [
   { name: "AICIC", logo: AICIC },
 ];
 
+// ─── Shared card width / logo-zone height ─────────────────────────────────────
+// Adjust these two constants to resize every scroll card in one place.
+const CARD_W = 148; // px  — card total width
+const LOGO_H = 100; // px  — logo-zone height (tall enough for any logo shape)
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const SponsorSection = () => {
@@ -40,11 +45,13 @@ export const SponsorSection = () => {
 
   const partners: Partner[] = config?.support?.items?.length
     ? config.support.items.map((s) => ({
-        // removed unused `idx`
         name: s.name,
         logo: s.logoUrl || null,
       }))
     : PARTNERS;
+
+  // Triple the array so the loop never shows a gap
+  const scrollItems = [...partners, ...partners, ...partners];
 
   return (
     <section
@@ -58,128 +65,148 @@ export const SponsorSection = () => {
       )}
     >
       <div className={cn("container", "mx-auto", "px-6")}>
-        {/* Header Text */}
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className={cn("max-w-3xl", "mb-16")}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className={cn(
-              "inline-flex",
-              "items-center",
-              "gap-2",
-              "px-4",
-              "py-2",
-              "rounded-full",
-              "bg-primary/10",
-              "text-primary",
-              "text-sm",
-              "font-bold",
-              "mb-6",
+              "inline-flex items-center gap-2",
+              "px-4 py-2 rounded-full",
+              "bg-primary/10 text-primary",
+              "text-sm font-bold mb-6",
             )}
           >
-            <Heart className={cn("w-4", "h-4")} />
+            <Heart className="w-4 h-4" />
             <span>Pay It Forward</span>
           </motion.div>
 
           <h2
             className={cn(
-              "text-4xl",
-              "md:text-5xl",
-              "font-black",
-              "text-foreground",
-              "mb-6",
-              "leading-tight",
+              "text-4xl md:text-5xl font-black",
+              "text-foreground mb-6 leading-tight",
             )}
           >
             Support Career Development of Nigerian Youths
           </h2>
-          <p className={cn("text-xl", "text-slate-600", "leading-relaxed")}>
+          <p className={cn("text-xl text-slate-600 leading-relaxed")}>
             At DIUSCADI, we believe one person can make a big difference and
             that kindness should be passed on. Join these leading brands in
             fueling the next generation of tech talent.
           </p>
         </div>
 
-        {/* Infinite Logo Slider */}
+        {/* ── Infinite logo slider ────────────────────────────────────────── */}
         <div
           className={cn(
-            "relative",
-            "mt-10",
-            "flex",
-            "overflow-hidden",
-            "group",
+            "relative mt-10 flex overflow-hidden",
+            // Extra vertical room so card shadows aren't clipped
+            "py-2",
           )}
         >
           <motion.div
-            className={cn(
-              "flex",
-              "whitespace-nowrap",
-              "items-center",
-              "gap-10",
-            )}
-            animate={{ x: [0, -1000] }}
+            className={cn("flex items-stretch gap-4 whitespace-nowrap")}
+            animate={{ x: [0, -(CARD_W + 16) * partners.length] }}
             transition={{
               x: {
                 repeat: Infinity,
                 repeatType: "loop",
-                duration: 40,
+                // Scale speed with number of cards so it never feels rushed
+                duration: partners.length * 5,
                 ease: "linear",
               },
             }}
           >
-            {[...partners, ...partners, ...partners].map((partner, index) => (
+            {scrollItems.map((partner, index) => (
               <div
                 key={`${partner.name}-${index}`}
+                style={{ width: CARD_W }}
                 className={cn(
-                  "flex flex-none w-[120px] h-[120px] md:h-[150px] md:w-[150px]",
-                  "items-center justify-center",
-                  "grayscale-50 opacity-60 hover:grayscale-0 hover:opacity-100",
-                  "transition-all duration-500 cursor-pointer",
+                  // Two-layer card — flex column, fixed width, auto height
+                  "flex-none flex flex-col",
+                  "rounded-xl overflow-hidden",
+                  "border border-slate-300",
+                  "bg-white",
+                  "shadow-sm",
+                  "hover:shadow-md hover:border-primary/30",
+                  "transition-all duration-300 cursor-pointer",
+                  "group",
                 )}
               >
-                {/* Only render Image when a logo src exists */}
-                {partner.logo !== null ? (
-                  <Image
-                    src={partner.logo} // string | StaticImageData — never null here
-                    alt={partner.name}
+                {/* ── Layer 1: Logo zone ─────────────────────────────────── */}
+                {/*
+                 * `relative` + `fill` Image + `object-contain` + padding:
+                 * the logo scales to fit whatever space it gets without
+                 * stretching — wide telecom bar, round badge, tall emblem, all fine.
+                 */}
+                <div
+                  style={{ height: LOGO_H }}
+                  className={cn(
+                    "relative w-full flex-shrink-0",
+                    "bg-white",
+                    "group-hover:bg-slate-50",
+                    "transition-colors duration-300",
+                  )}
+                >
+                  {partner.logo !== null ? (
+                    <Image
+                      src={partner.logo}
+                      alt={`${partner.name} logo`}
+                      fill
+                      sizes={`${CARD_W}px`}
+                      className={cn(
+                        "object-contain",
+                        "p-3", // breathing room inside the zone
+                      )}
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        "w-full h-full flex items-center justify-center",
+                        "bg-slate-100 text-slate-400 text-2xl font-black select-none",
+                      )}
+                    >
+                      {partner.name
+                        .split(" ")
+                        .map((w) => w[0])
+                        .slice(0, 2)
+                        .join("")}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Layer 2: Name badge ────────────────────────────────── */}
+                <div
+                  className={cn(
+                    "px-2 py-2",
+                    "border-t border-slate-100",
+                    "bg-slate-50 group-hover:bg-primary",
+                    "transition-colors duration-300",
+                  )}
+                >
+                  <p
                     className={cn(
-                      "h-full",
-                      "w-full",
-                      "rounded-xl",
-                      "object-contain",
-                    )}
-                  />
-                ) : (
-                  /* Fallback: name-only pill when no logo is available */
-                  <div
-                    className={cn(
-                      "w-full h-full rounded-xl",
-                      "flex items-center justify-center text-center",
-                      "bg-slate-300 text-slate-600 text-xs font-bold px-2",
+                      "text-[11px] font-bold text-center leading-tight",
+                      "text-slate-700 group-hover:text-white",
+                      "transition-colors duration-300",
+                      // Allow the name to wrap — no more invisible overflow
+                      "whitespace-normal break-words line-clamp-2",
                     )}
                   >
                     {partner.name}
-                  </div>
-                )}
+                  </p>
+                </div>
               </div>
             ))}
           </motion.div>
 
-          {/* Gradient overlays */}
-          <div
-            className={cn(
-              "absolute inset-y-0 left-0 w-32 bg-linear-to-r from-slate-200 to-transparent z-10 pointer-events-none",
-            )}
-          />
-          <div
-            className={cn(
-              "absolute inset-y-0 right-0 w-32 bg-linear-to-l from-slate-200 to-transparent z-10 pointer-events-none",
-            )}
-          />
+          {/* Gradient fade edges */}
+          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-slate-200 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-slate-200 to-transparent z-10 pointer-events-none" />
         </div>
 
-        {/* Action Card */}
+        {/* ── Action card ─────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
@@ -191,11 +218,11 @@ export const SponsorSection = () => {
             "relative overflow-hidden",
           )}
         >
-          <div className={cn("relative", "z-10")}>
-            <h3 className={cn("text-2xl", "md:text-3xl", "font-bold", "mb-2")}>
+          <div className="relative z-10">
+            <h3 className={cn("text-2xl md:text-3xl font-bold mb-2")}>
               Ready to make an impact?
             </h3>
-            <p className={cn("text-muted-foreground", "text-lg")}>
+            <p className={cn("text-muted-foreground text-lg")}>
               Partner with us for the 2026 Academic Session.
             </p>
           </div>
@@ -211,21 +238,10 @@ export const SponsorSection = () => {
             )}
           >
             Sponsor DIUSCADI
-            <ArrowRight
-              className={cn(
-                "w-5",
-                "h-5",
-                "group-hover:translate-x-1",
-                "transition-transform",
-              )}
-            />
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
 
-          <div
-            className={cn(
-              "absolute -bottom-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[80px]",
-            )}
-          />
+          <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[80px]" />
         </motion.div>
       </div>
     </section>
